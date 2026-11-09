@@ -78,6 +78,20 @@ h1, h2 { font-family: Arial, Helvetica, sans-serif; }
   text-decoration: none;
 }
 .primary-button:hover { background: #1d55c9; }
+.primary-button:disabled { opacity: .55; cursor: not-allowed; }
+.import-panel { margin-top: 18px; }
+.import-form { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-top: 20px; }
+.file-field { display: grid; flex: 1 1 230px; gap: 8px; color: #536171; font-size: 13px; font-weight: 600; }
+.file-field input { width: 100%; padding: 8px; border: 1px solid #dfe5ec; border-radius: 9px; background: #fff; font-size: 12px; }
+.message { margin: 16px 0 0; }
+.summary-notes { padding: 14px 16px; margin-top: 16px; border-radius: 9px; background: #fff9ee; color: #705524; font-size: 13px; line-height: 1.5; }
+.summary-notes p { margin: 4px 0; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.filter-bar button { padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: white; color: #536171; font-size: 12px; }
+.filter-bar button.active { border-color: var(--blue); background: #eef4ff; color: #2456bd; font-weight: 700; }
+.risk-pill { display: inline-block; padding: 4px 8px; border-radius: 99px; background: #edf2fa; color: #475569; font-size: 11px; }
+.risk-pill.warning { background: #fff1d2; color: #8a5700; }
+.risk-pill.danger { background: #ffebea; color: #a72f2f; }
 .upload-button { position: relative; overflow: hidden; flex: 0 0 auto; }
 .upload-button input { position: absolute; inset: 0; width: 100%; cursor: pointer; opacity: 0; }
 .upload-button.disabled { cursor: progress; opacity: .65; }

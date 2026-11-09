@@ -1,32 +1,27 @@
-# Cloud
+# Cloud — Gestão de STUCK
 
-Painel interno para importar relatórios da Shopee, analisar a operação logística e guardar os registros por mês.
+Painel para cruzar o relatório de mercadorias paradas da Shopee com um segundo CSV contendo os status atualizados.
 
-## Funcionalidades
+## Utilização
 
-- Sem login ou cadastro dentro do Cloud.
-- Importação diária do CSV: cada pedido é identificado pelo `Order ID` e atualizado pela última importação que o contém, inclusive quando aparecer novamente em outro mês. Importe os arquivos em ordem cronológica; um arquivo antigo pode sobrescrever dados mais recentes.
-- Validação do cabeçalho e armazenamento apenas destas 12 colunas: `Order ID`, `Buyer Name`, `Location Type`, `Postal Code`, `Driver ID`, `Driver Name`, `Driver Phone`, `Current Station Received Time`, `Delivered Time`, `OnHold Time`, `Status` e `Current Station`.
-- Banco IndexedDB local ao navegador, sem sincronização. O mês do pedido é o de `Current Station Received Time`, não o mês da importação. Uma mudança nessa data muda o mês associado ao pedido.
-- Indicadores mensais e distribuição dos status atuais, filtro por status, busca e paginação. A taxa de entrega é a proporção de pedidos recebidos no mês cujo status atual é `Delivered`; os demais são contados como não entregues, inclusive status vazio ou desconhecido.
-- Evolução semanal de segunda a domingo: recebimentos por `Current Station Received Time` e entregas por `Delivered Time` para pedidos cujo status atual é `Delivered`. Cada semana considera dados de todos os meses, incluindo as entregas em mês diferente do recebimento. Datas são consideradas como escritas no CSV, sem conversão de fuso. Esses indicadores usam o estado mais recentemente importado, não um histórico das mudanças de status.
-- O arquivo original é lido em memória; somente os campos permitidos são persistidos no navegador. Nenhum CSV ou registro é enviado ao GitHub.
+1. Selecione o CSV **STUCK** com as colunas `Operação`, `Cidade`, `Entegador`, `TN`, `Status`, `Dias parados`, `Valor`, `Palavra Chave` e `Avaria`.
+2. Selecione o CSV **status atualizado** com as colunas `Order ID`, `Status`, `Driver Name`, `Driver Phone`, `Current Station`, `Current Station Received Time` e `Delivered Time`.
+3. Clique em **Analisar arquivos**. O sistema cruza `TN` com `Order ID`, usando somente o relatório STUCK como lista de mercadorias. A operação substitui a lista salva anteriormente.
 
-## Executar localmente
+Os dois CSVs devem ter cabeçalhos, de 1 a 10.000 registros, até 10 MB cada, sem IDs vazios ou duplicados. O processamento verifica ambos antes de substituir os dados. Pedidos do STUCK sem status atualizado são destacados para verificação; pedidos adicionais no arquivo de status são contados, mas não entram na lista.
 
-1. Instale Node.js 20 ou superior.
-2. Execute `npm install` e `npm run dev`, então abra `http://localhost:3000`.
+O painel separa pedidos cujo status atualizado seja `Delivered` como entregues. Todos os demais, inclusive os sem correspondência ou status, aparecem como **a tratar ou verificar**; um status diferente de `Delivered` não significa necessariamente que a mercadoria ainda está fisicamente parada.
 
-## Hospedagem e acesso
+O indicador de dias usa exclusivamente `Dias parados` do relatório STUCK, sem incrementar os dias após a importação. Aos 15 dias, o painel indica **prazo limite**; acima de 15 dias, indica **possível LOST**, não confirmação de ocorrência ou débito. As contagens de limite e possível LOST excluem pedidos entregues.
 
-O GitHub Pages publica o código do site, mas os dados importados permanecem no dispositivo e perfil de navegador usados para a importação; não são sincronizados. Em outro navegador ou computador será necessário importar novamente os CSVs. Limpar os dados do site, usar navegação privada ou perder o dispositivo pode apagar o banco local. Guarde os CSVs de origem em local protegido para recuperação.
+## Privacidade e armazenamento
 
-Como não há login nem criptografia própria, qualquer pessoa com acesso ao perfil do navegador pode consultar os dados locais. O armazenamento de páginas sob o mesmo domínio `github.io` também compartilha a mesma origem: outros sites no mesmo domínio, se controlados por terceiros ou comprometidos, podem acessar esses dados. Use dispositivo e perfil restritos; para dados pessoais, prefira uma hospedagem com domínio dedicado e controles de acesso apropriados. O banco SQLite de uma versão anterior não é migrado automaticamente.
+O site funciona sem login. Os dois CSVs são processados localmente e os campos necessários são salvos no IndexedDB do navegador; não são enviados ao GitHub. Outra pessoa com acesso ao mesmo perfil de navegador pode ver os dados. Eles não são sincronizados entre computadores, podem ser apagados ao limpar os dados do site e não substituem backups protegidos dos arquivos originais.
 
-Para publicar, habilite **Settings → Pages → Build and deployment → Source: GitHub Actions**. O fluxo `.github/workflows/pages.yml` gera e publica o site ao atualizar `main`. A disponibilidade do Pages em repositórios privados depende do plano; não torne o repositório público sem aprovação.
+O banco da versão anterior não é removido nem migrado; o novo painel usa um banco separado. Sites em caminhos diferentes sob o mesmo domínio `github.io` compartilham a mesma origem e podem acessar o armazenamento uns dos outros. Para proteger dados pessoais, prefira um domínio dedicado e um dispositivo e perfil de navegador de acesso restrito.
 
-## Verificações
+## Desenvolvimento e publicação
 
-- `npm test` executa os testes do parser e do banco.
-- `npm run lint` verifica o código.
-- `npm run build` gera a aplicação de produção.
+Com Node.js 20 ou superior, execute `npm install` e `npm run dev`. Para verificar alterações, execute `npm test`, `npm run lint` e `npm run build`.
+
+O fluxo `.github/workflows/pages.yml` gera e publica a aplicação estática no GitHub Pages. Em **Settings → Pages**, selecione **GitHub Actions** como fonte de publicação para evitar que uma publicação da branch sobrescreva a versão gerada.
