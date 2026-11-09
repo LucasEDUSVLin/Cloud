@@ -16,6 +16,8 @@ O botão **Copiar TN (BR)**, ao lado do relatório STUCK, copia os códigos TN d
 
 O indicador de dias usa exclusivamente `Dias parados` do relatório STUCK, sem incrementar os dias após a importação. O painel apenas compara esse número com 15 dias (abaixo, igual ou acima); não infere LOST nem débito. Nenhum dado é criado: tudo vem dos CSVs.
 
+Os indicadores financeiros somam o campo `Valor` do relatório STUCK em reais: o total inclui todos os registros da lista, e a distribuição por status usa o `Status` do CSV atualizado. O débito por LOST considera somente registros cujo status atualizado seja exatamente `LOST` (sem diferenciar maiúsculas de minúsculas); dias parados acima de 15 não são tratados como LOST. Valores fora do formato numérico com ponto decimal e até duas casas são rejeitados para evitar totais incorretos.
+
 ## Privacidade e armazenamento
 
 O site funciona sem login. Os dois CSVs são processados localmente e os campos necessários são salvos no IndexedDB do navegador; não são enviados ao GitHub. Outra pessoa com acesso ao mesmo perfil de navegador pode ver os dados. Eles não são sincronizados entre computadores, podem ser apagados ao limpar os dados do site e não substituem backups protegidos dos arquivos originais.

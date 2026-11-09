@@ -130,6 +130,7 @@ h1, h2 { font-family: Arial, Helvetica, sans-serif; }
 .status-card:hover, .status-card.active { border-color: var(--blue); background: #fff6f2; }
 .status-card > span:first-child { color: #536171; font-size: 12px; }
 .status-card strong { font-size: 20px; }
+.status-card .status-value { color: var(--muted); font-size: 12px; }
 .status-track { height: 5px; overflow: hidden; border-radius: 5px; background: #fdeee6; }
 .status-track span { display: block; height: 100%; background: var(--blue); }
 .week-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; font-size: 12px; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { delivered, extractTrackingNumbers, processStuckFiles, risk } from "./stuck";
+import { delivered, extractTrackingNumbers, parseValueCents, processStuckFiles, risk, valueTotals } from "./stuck";
 
 const stuckHeader = "Operação,Cidade,Entegador,TN,Status,Dias parados,Valor,Palavra Chave,Avaria";
 const statusHeader = "Order ID,Status,Driver Name,Driver Phone,Current Station,Current Station Received Time,Delivered Time";
@@ -33,5 +33,28 @@ describe("relatórios STUCK", () => {
 
   it("extrai os códigos TN do relatório STUCK", () => {
     expect(extractTrackingNumbers([stuckHeader, stuckRow("A", "1"), stuckRow("B", "2")].join("\n"))).toEqual(["A", "B"]);
+  });
+
+  it("soma os valores por status atualizado e considera LOST somente quando explícito", () => {
+    const snapshot = processStuckFiles(
+      [stuckHeader, stuckRow("A", "1"), stuckRow("B", "2"), stuckRow("C", "3")].join("\n"),
+      [statusHeader, statusRow("A", "LOST"), statusRow("B", "lost"), statusRow("C", "OnHold")].join("\n"),
+    );
+    const totals = valueTotals(snapshot.records);
+    expect(totals.totalCents).toBe(6723);
+    expect(totals.lostCents).toBe(4482);
+    expect(totals.byStatus.get("LOST")).toBe(2241);
+    expect(totals.byStatus.get("lost")).toBe(2241);
+    expect(totals.byStatus.get("OnHold")).toBe(2241);
+    expect(() => parseValueCents("1,234.56")).toThrow();
+  });
+
+  it("rejeita valor vazio ou fora do formato numérico do CSV", () => {
+    expect(() => processStuckFiles(
+      [stuckHeader, stuckRow("A", "1").replace("22.41", "")].join("\n"),
+      [statusHeader, statusRow("A", "LOST")].join("\n"),
+    )).toThrow("Valor inválido");
+    expect(parseValueCents("990")).toBe(99000);
+    expect(parseValueCents("910.8")).toBe(91080);
   });
 });

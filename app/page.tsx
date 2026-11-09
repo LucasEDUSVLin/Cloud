@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { delivered, processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers } from "@/lib/stuck";
+import { delivered, processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers, valueTotals } from "@/lib/stuck";
 import { readSnapshot, saveSnapshot } from "@/lib/stuck-storage";
 
 type Filter = "open" | "delivered" | "overdue" | "unmatched" | "all";
 const PAGE_SIZE = 50;
+const currencyFormat = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+function formatCurrency(cents: number) {
+  return currencyFormat.format(cents / 100);
+}
 
 function statusLabel(status: string | null) {
   return status || "Sem status atualizado";
@@ -57,6 +62,7 @@ export default function Home() {
       unmatched: records.filter((row) => !row.updatedStatus).length,
     };
   }, [snapshot]);
+  const amounts = useMemo(() => valueTotals(snapshot?.records ?? []), [snapshot]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
@@ -181,6 +187,8 @@ export default function Home() {
               <Metric label="Não entregues" value={counts.open} />
               <Metric label="Entregues" value={counts.delivered} />
               <Metric label="Acima de 15 dias (não entregues)" value={counts.overdue} />
+              <Metric label="Valor total no relatório STUCK" value={formatCurrency(amounts.totalCents)} />
+              <Metric label="Débito por status LOST" value={formatCurrency(amounts.lostCents)} />
             </div>
             <div className="summary-notes">
               <p><strong>{counts.limit}</strong> mercadoria(s) não entregues com exatamente 15 dias. <strong>{counts.unmatched}</strong> sem status atualizado correspondente.</p>
@@ -199,6 +207,7 @@ export default function Home() {
                     type="button" aria-pressed={statusFilter === status}
                     onClick={() => { setFilter("all"); setStatusFilter(statusFilter === status ? null : status); setPage(0); }}>
                     <span>{statusLabel(status || null)}</span><strong>{count.toLocaleString("pt-BR")}</strong>
+                    <span className="status-value">Valor: {formatCurrency(amounts.byStatus.get(status) ?? 0)}</span>
                     <span className="status-track"><span style={{ width: `${count * 100 / counts.total}%` }} /></span>
                   </button>
                 ))}
@@ -260,6 +269,6 @@ export default function Home() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
-  return <article className="metric-card"><p>{label}</p><strong>{value.toLocaleString("pt-BR")}</strong></article>;
+function Metric({ label, value }: { label: string; value: number | string }) {
+  return <article className="metric-card"><p>{label}</p><strong>{typeof value === "number" ? value.toLocaleString("pt-BR") : value}</strong></article>;
 }

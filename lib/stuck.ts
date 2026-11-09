@@ -66,6 +66,12 @@ export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSn
     if (!/^\d+$/.test(rawDays) || !Number.isSafeInteger(Number(rawDays))) {
       throw new Error(`Arquivo STUCK: Dias parados inválido na linha ${index + 2}.`);
     }
+    const value = (row.Valor ?? "").trim();
+    try {
+      parseValueCents(value);
+    } catch (caught) {
+      throw new Error(`Arquivo STUCK: Valor inválido na linha ${index + 2}.`, { cause: caught });
+    }
     const update = updates.get(tracking);
     const status = (update?.Status ?? "").trim();
     return {
@@ -74,7 +80,7 @@ export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSn
       city: (row.Cidade ?? "").trim(),
       driver: (row.Entegador ?? "").trim(),
       days: Number(rawDays),
-      value: (row.Valor ?? "").trim(),
+      value,
       damage: (row.Avaria ?? "").trim(),
       stuckStatus: (row.Status ?? "").trim(),
       updatedStatus: status || null,
@@ -95,6 +101,35 @@ export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSn
 export function extractTrackingNumbers(stuckCsv: string) {
   const rows = parseFile(stuckCsv, STUCK_COLUMNS, "Arquivo STUCK");
   return [...uniqueMap(rows, "TN", "Arquivo STUCK").keys()];
+}
+
+export function parseValueCents(value: string) {
+  const normalized = value.trim();
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) {
+    throw new Error("Valor deve ser um número não negativo com até duas casas decimais.");
+  }
+  const [whole, fraction = ""] = normalized.split(".");
+  const cents = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+  if (!Number.isSafeInteger(cents)) {
+    throw new Error("Valor excede o limite numérico permitido.");
+  }
+  return cents;
+}
+
+export function valueTotals(records: readonly StuckRecord[]) {
+  const byStatus = new Map<string, number>();
+  let totalCents = 0;
+  let lostCents = 0;
+
+  for (const record of records) {
+    const cents = parseValueCents(record.value);
+    const status = record.updatedStatus ?? "";
+    totalCents += cents;
+    byStatus.set(status, (byStatus.get(status) ?? 0) + cents);
+    if (status.trim().toLocaleUpperCase("pt-BR") === "LOST") lostCents += cents;
+  }
+
+  return { totalCents, lostCents, byStatus };
 }
 
 export function delivered(record: StuckRecord) {
