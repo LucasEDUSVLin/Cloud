@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cloud | Gestão de STUCK",
+  title: "STUCK",
   description: "Acompanhamento de mercadorias paradas em STUCK.",
   robots: { index: false, follow: false },
 };

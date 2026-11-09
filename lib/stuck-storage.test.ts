@@ -8,7 +8,7 @@ const stuck = "Operação,Cidade,Entegador,TN,Status,Dias parados,Valor,Palavra 
 
 beforeEach(async () => {
   await new Promise<void>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase("cloud-stuck");
+    const request = indexedDB.deleteDatabase("stuck-monitor");
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });

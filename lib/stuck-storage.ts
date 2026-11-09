@@ -1,6 +1,6 @@
 import type { StuckSnapshot } from "./stuck";
 
-const DATABASE = "cloud-stuck";
+const DATABASE = "stuck-monitor";
 const STORE = "snapshots";
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -11,7 +11,7 @@ function openDatabase(): Promise<IDBDatabase> {
     request.onerror = () => reject(new Error("Não foi possível abrir o banco local."));
     request.onblocked = () => {
       blocked = true;
-      reject(new Error("Feche outras abas do Cloud e tente novamente."));
+      reject(new Error("Feche outras abas do STUCK e tente novamente."));
     };
     request.onsuccess = () => {
       const db = request.result;

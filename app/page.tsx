@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { delivered, processStuckFiles, risk, type StuckRecord, type StuckSnapshot } from "@/lib/stuck";
+import { delivered, processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers } from "@/lib/stuck";
 import { readSnapshot, saveSnapshot } from "@/lib/stuck-storage";
 
 type Filter = "open" | "delivered" | "overdue" | "unmatched" | "all";
@@ -79,6 +79,19 @@ export default function Home() {
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
   const visible = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
+  async function handleCopyTn() {
+    if (!stuckFile) return;
+    setError("");
+    setNotice("");
+    try {
+      const codes = extractTrackingNumbers(await stuckFile.text());
+      await navigator.clipboard.writeText(codes.join("\n"));
+      setNotice(`${codes.length} código(s) TN copiados.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível copiar os códigos TN.");
+    }
+  }
+
   async function handleImport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -118,8 +131,8 @@ export default function Home() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand"><span className="brand-mark small">C</span><span>Cloud</span></div>
-        <span className="topbar-caption">GESTÃO DE STUCK</span>
+        <div className="brand"><span className="brand-mark small">S</span><span>STUCK</span></div>
+        <span className="topbar-caption">SHOPEE</span>
       </header>
       <section className="content">
         <div className="page-heading">
@@ -139,10 +152,13 @@ export default function Home() {
             <p className="muted">Selecione o relatório STUCK e o CSV com os status atualizados. Uma nova importação substitui a lista anterior.</p>
           </div>
           <form onSubmit={handleImport} className="import-form">
-            <label className="file-field">
-              <span>1. Relatório STUCK da Shopee</span>
-              <input type="file" accept=".csv,text/csv" onChange={(event) => setStuckFile(event.target.files?.[0] ?? null)} disabled={busy} />
-            </label>
+            <div className="file-row">
+              <label className="file-field">
+                <span>1. Relatório STUCK da Shopee</span>
+                <input type="file" accept=".csv,text/csv" onChange={(event) => setStuckFile(event.target.files?.[0] ?? null)} disabled={busy} />
+              </label>
+              <button type="button" className="secondary-button" onClick={handleCopyTn} disabled={busy || !stuckFile}>Copiar TN (BR)</button>
+            </div>
             <label className="file-field">
               <span>2. Status atualizado dos pedidos</span>
               <input type="file" accept=".csv,text/csv" onChange={(event) => setStatusFile(event.target.files?.[0] ?? null)} disabled={busy} />

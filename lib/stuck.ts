@@ -92,6 +92,11 @@ export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSn
   };
 }
 
+export function extractTrackingNumbers(stuckCsv: string) {
+  const rows = parseFile(stuckCsv, STUCK_COLUMNS, "Arquivo STUCK");
+  return [...uniqueMap(rows, "TN", "Arquivo STUCK").keys()];
+}
+
 export function delivered(record: StuckRecord) {
   return record.updatedStatus?.toLowerCase() === "delivered";
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { delivered, processStuckFiles, risk } from "./stuck";
+import { delivered, extractTrackingNumbers, processStuckFiles, risk } from "./stuck";
 
 const stuckHeader = "Operação,Cidade,Entegador,TN,Status,Dias parados,Valor,Palavra Chave,Avaria";
 const statusHeader = "Order ID,Status,Driver Name,Driver Phone,Current Station,Current Station Received Time,Delivered Time";
@@ -29,5 +29,9 @@ describe("relatórios STUCK", () => {
     expect(() => processStuckFiles([stuckHeader, stuckRow("A", "3,5")].join("\n"), status)).toThrow();
     expect(() => processStuckFiles([stuckHeader, stuckRow("A", "-1")].join("\n"), status)).toThrow("Dias parados inválido");
     expect(() => processStuckFiles([stuckHeader, stuckRow("A", "3")].join("\n"), [statusHeader, statusRow("A", "Delivered"), statusRow("A", "OnHold")].join("\n"))).toThrow("duplicado");
+  });
+
+  it("extrai os códigos TN do relatório STUCK", () => {
+    expect(extractTrackingNumbers([stuckHeader, stuckRow("A", "1"), stuckRow("B", "2")].join("\n"))).toEqual(["A", "B"]);
   });
 });
