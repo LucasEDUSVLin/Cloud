@@ -10,9 +10,9 @@ Painel para cruzar o relatório de mercadorias paradas da Shopee com um segundo 
 
 Os dois CSVs devem ter cabeçalhos, de 1 a 10.000 registros, até 10 MB cada, sem IDs vazios ou duplicados. O processamento verifica ambos antes de substituir os dados. Pedidos do STUCK sem status atualizado são destacados para verificação; pedidos adicionais no arquivo de status são contados, mas não entram na lista.
 
-O painel separa pedidos cujo status atualizado seja `Delivered` como entregues. Todos os demais, inclusive os sem correspondência ou status, aparecem como **a tratar ou verificar**; um status diferente de `Delivered` não significa necessariamente que a mercadoria ainda está fisicamente parada.
+O painel separa pedidos cujo status atualizado seja `Delivered` como entregues. Os demais aparecem como **não entregues**, com o status exatamente como está no CSV (sem tradução). Pedidos sem correspondência mostram "Sem status atualizado".
 
-O indicador de dias usa exclusivamente `Dias parados` do relatório STUCK, sem incrementar os dias após a importação. Aos 15 dias, o painel indica **prazo limite**; acima de 15 dias, indica **possível LOST**, não confirmação de ocorrência ou débito. As contagens de limite e possível LOST excluem pedidos entregues.
+O indicador de dias usa exclusivamente `Dias parados` do relatório STUCK, sem incrementar os dias após a importação. O painel apenas compara esse número com 15 dias (abaixo, igual ou acima); não infere LOST nem débito. Nenhum dado é criado: tudo vem dos CSVs.
 
 ## Privacidade e armazenamento
 

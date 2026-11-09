@@ -17,9 +17,9 @@ describe("relatórios STUCK", () => {
     expect(delivered(snapshot.records[1])).toBe(false);
     expect(snapshot.records[2].updatedStatus).toBeNull();
     expect(snapshot.unmatchedUpdates).toBe(1);
-    expect(risk(snapshot.records[0])).toBe("15 dias — prazo limite");
+    expect(risk(snapshot.records[0])).toBe("15 dias");
     expect(risk(snapshot.records[1])).toBe("Acima de 15 dias");
-    expect(risk(snapshot.records[2])).toBe("12 dias restantes");
+    expect(risk(snapshot.records[2])).toBe("Abaixo de 15 dias");
   });
 
   it("rejeita cabeçalho errado, IDs repetidos e dias inválidos", () => {

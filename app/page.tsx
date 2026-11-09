@@ -7,18 +7,8 @@ import { readSnapshot, saveSnapshot } from "@/lib/stuck-storage";
 type Filter = "open" | "delivered" | "overdue" | "unmatched" | "all";
 const PAGE_SIZE = 50;
 
-const STATUS_LABELS: Record<string, string> = {
-  delivered: "Entregue", delivering: "Em entrega", onhold: "Em espera",
-  hub_received: "Recebido no hub", hub_assigned: "Atribuído no hub",
-  hub_packed: "Preparado no hub", soc_received: "Recebido no centro de distribuição",
-  return_soc_received: "Devolução recebida no centro", return_hub_packed: "Devolução preparada no hub",
-  soc_lharrived: "Chegou ao centro", disposed: "Descartado",
-  liquidate_packed: "Preparado para liquidação",
-};
-
 function statusLabel(status: string | null) {
-  if (!status) return "Sem status atualizado";
-  return STATUS_LABELS[status.toLowerCase()] ?? status;
+  return status || "Sem status atualizado";
 }
 
 function formatTime(date: string) {
@@ -136,7 +126,7 @@ export default function Home() {
           <div>
             <p className="eyebrow">PAINEL DE OPERAÇÕES</p>
             <h1>Acompanhamento de STUCK</h1>
-            <p className="muted">Identifique mercadorias paradas e priorize o tratamento antes do prazo.</p>
+            <p className="muted">Mercadorias do relatório STUCK com o status do arquivo atualizado.</p>
           </div>
         </div>
         <div className="privacy-note">
@@ -172,14 +162,14 @@ export default function Home() {
             </div>
             <div className="metric-grid">
               <Metric label="No relatório STUCK" value={counts.total} />
-              <Metric label="A tratar ou verificar" value={counts.open} />
+              <Metric label="Não entregues" value={counts.open} />
               <Metric label="Entregues" value={counts.delivered} />
-              <Metric label="Acima de 15 dias a verificar" value={counts.overdue} />
+              <Metric label="Acima de 15 dias (não entregues)" value={counts.overdue} />
             </div>
             <div className="summary-notes">
-              <p><strong>{counts.limit}</strong> mercadoria(s) não entregues no limite de 15 dias. <strong>{counts.unmatched}</strong> sem status atualizado correspondente.</p>
+              <p><strong>{counts.limit}</strong> mercadoria(s) não entregues com exatamente 15 dias. <strong>{counts.unmatched}</strong> sem status atualizado correspondente.</p>
               {snapshot.unmatchedUpdates > 0 && <p>{snapshot.unmatchedUpdates} pedido(s) do arquivo de status não constam no relatório STUCK e foram ignorados.</p>}
-              <p>Os dias são os informados pela Shopee no arquivo; não aumentam automaticamente. Acima de 15 dias indica <strong>possível LOST</strong>, não confirmação de débito.</p>
+              <p>Todos os valores exibidos vêm dos arquivos importados. Os dias são os do arquivo STUCK e não aumentam automaticamente. A comparação com 15 dias é apenas a regra informada por você.</p>
             </div>
 
             <section className="panel">
@@ -208,7 +198,7 @@ export default function Home() {
               </div>
               <div className="filter-bar" aria-label="Filtros de mercadorias">
                 {([
-                  ["open", `A tratar (${counts.open})`],
+                  ["open", `Não entregues (${counts.open})`],
                   ["overdue", `Acima de 15 dias (${counts.overdue})`],
                   ["unmatched", `Sem status atualizado (${counts.unmatched})`],
                   ["delivered", `Entregues (${counts.delivered})`],
@@ -221,15 +211,16 @@ export default function Home() {
                 <>
                   <div className="table-scroll">
                     <table>
-                      <thead><tr><th>Rastreamento</th><th>Dias parados</th><th>Prazo informado</th><th>Status atualizado</th><th>Status no STUCK</th><th>Entregador atualizado</th><th>Cidade</th><th>Estação atual</th><th>Avaria</th><th>Valor informado</th></tr></thead>
+                      <thead><tr><th>Rastreamento</th><th>Dias parados</th><th>Comparação com 15 dias</th><th>Status atualizado</th><th>Status no STUCK</th><th>Entregador (status)</th><th>Entregador (STUCK)</th><th>Cidade</th><th>Estação atual</th><th>Avaria</th><th>Valor</th></tr></thead>
                       <tbody>{visible.map((row) => (
                         <tr key={row.tracking}>
                           <td className="order-id">{row.tracking}</td>
                           <td><strong>{row.days}</strong></td>
-                          <td><span className={`risk-pill ${row.days > 15 && !delivered(row) ? "danger" : row.days === 15 && !delivered(row) ? "warning" : ""}`}>{delivered(row) ? "Entregue" : risk(row)}</span></td>
+                          <td><span className={`risk-pill ${row.days > 15 && !delivered(row) ? "danger" : row.days === 15 && !delivered(row) ? "warning" : ""}`}>{delivered(row) ? "Delivered" : risk(row)}</span></td>
                           <td><span className="status-pill" title={row.updatedStatus ?? ""}>{statusLabel(row.updatedStatus)}</span></td>
                           <td>{row.stuckStatus || "—"}</td>
-                          <td>{row.updatedDriver || row.driver || "—"}</td>
+                          <td>{row.updatedDriver || "—"}</td>
+                          <td>{row.driver || "—"}</td>
                           <td>{row.city || "—"}</td>
                           <td>{row.station || "—"}</td>
                           <td>{row.damage || "—"}</td>

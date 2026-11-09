@@ -98,6 +98,6 @@ export function delivered(record: StuckRecord) {
 
 export function risk(record: StuckRecord) {
   if (record.days > 15) return "Acima de 15 dias";
-  if (record.days === 15) return "15 dias — prazo limite";
-  return `${15 - record.days} ${15 - record.days === 1 ? "dia restante" : "dias restantes"}`;
+  if (record.days === 15) return "15 dias";
+  return "Abaixo de 15 dias";
 }
