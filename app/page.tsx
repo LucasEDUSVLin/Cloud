@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { parseLogisticsCsv, type LogisticsRecord } from "@/lib/csv";
 import { addDays, mondayOfWeek } from "@/lib/dates";
-
-type MonthSummary = { month: string; count: number };
-type WeekDay = { date: string; received: number; delivered: number };
+import { readRecords, saveRecords, summarize } from "@/lib/storage";
 const PAGE_SIZE = 50;
 
 const statusNames: Record<string, string> = {
@@ -47,61 +45,38 @@ function formatCsvDate(value: string) {
   return value ? value.replace(/^(\d{2})-(\d{2})-(\d{4})\s/, "$1/$2/$3 ") : "—";
 }
 
-async function getJson(url: string, signal?: AbortSignal) {
-  const response = await fetch(url, { signal, cache: "no-store" });
-  if (!response.ok) {
-    throw new Error("Não foi possível carregar os dados. Verifique a conexão com o servidor.");
-  }
-  return response.json();
-}
-
 export default function Home() {
   const [month, setMonth] = useState(() => today().slice(0, 7));
   const [weekDate, setWeekDate] = useState(today);
-  const [months, setMonths] = useState<MonthSummary[]>([]);
-  const [records, setRecords] = useState<LogisticsRecord[]>([]);
-  const [week, setWeek] = useState<WeekDay[]>([]);
+  const [allRecords, setAllRecords] = useState<LogisticsRecord[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [weekLoading, setWeekLoading] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
   const [importing, setImporting] = useState(false);
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState("");
-  const [weekError, setWeekError] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    const controller = new AbortController();
-    getJson("/api/months", controller.signal)
-      .then((data) => setMonths(data.months as MonthSummary[]))
-      .catch((caught) => { if (!controller.signal.aborted) setError(caught.message); });
-    return () => controller.abort();
+    let active = true;
+    setLoading(true);
+    readRecords()
+      .then((data) => { if (active) { setAllRecords(data); setUnavailable(false); } })
+      .catch((caught) => {
+        if (active) {
+          setUnavailable(true);
+          setError(caught instanceof Error ? caught.message : "Falha ao ler o banco local.");
+        }
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [revision]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setRecords([]);
-    getJson(`/api/records?month=${encodeURIComponent(month)}`, controller.signal)
-      .then((data) => setRecords(data.records as LogisticsRecord[]))
-      .catch((caught) => { if (!controller.signal.aborted) setError(caught.message); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
-  }, [month, revision]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setWeekLoading(true);
-    setWeekError("");
-    setWeek([]);
-    getJson(`/api/weekly?date=${encodeURIComponent(weekDate)}`, controller.signal)
-      .then((data) => setWeek(data.days as WeekDay[]))
-      .catch((caught) => { if (!controller.signal.aborted) setWeekError(caught.message); })
-      .finally(() => { if (!controller.signal.aborted) setWeekLoading(false); });
-    return () => controller.abort();
-  }, [weekDate, revision]);
+  const { months, records, days: week } = useMemo(
+    () => summarize(allRecords, month, weekDate), [allRecords, month, weekDate],
+  );
 
   const delivered = records.filter((row) => row.Status.toLowerCase() === "delivered").length;
   const statuses = useMemo(() => {
@@ -141,15 +116,9 @@ export default function Home() {
     setImporting(true);
     try {
       const selectedRecords = parseLogisticsCsv(await file.text());
-      const response = await fetch("/api/records", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ records: selectedRecords }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Não foi possível importar o arquivo.");
+      const imported = await saveRecords(selectedRecords);
       setRevision((value) => value + 1);
-      setNotice(`${payload.imported.toLocaleString("pt-BR")} registros importados ou atualizados. Cada pedido aparece no mês de recebimento.`);
+      setNotice(`${imported.toLocaleString("pt-BR")} registros importados ou atualizados neste navegador. Cada pedido aparece no mês de recebimento.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Falha ao importar o CSV.");
     } finally {
@@ -177,7 +146,7 @@ export default function Home() {
           </label>
         </div>
         <div className="privacy-note">
-          Importe o CSV mais recente: pedidos existentes são atualizados. O arquivo original não é armazenado.
+          Os dados ficam somente neste navegador e não são compartilhados. Limpar os dados do navegador pode apagá-los. Importe os arquivos em ordem cronológica.
         </div>
         {error && <p className="error import-error" role="alert">{error}</p>}
         {notice && <p className="success" role="status">{notice}</p>}
@@ -192,7 +161,9 @@ export default function Home() {
               }} />
           </label>
         </div>
-        {loading ? <p className="empty-state" role="status">Carregando indicadores do mês...</p> : (
+        {loading ? <p className="empty-state" role="status">Carregando indicadores do mês...</p> : unavailable ? (
+          <p className="empty-state">Indicadores indisponíveis: falha ao ler o banco local.</p>
+        ) : (
           <>
             <div className="metric-grid">
               <Metric label="Recebidos no mês" value={records.length} />
@@ -235,7 +206,9 @@ export default function Home() {
             <button onClick={() => setWeekDate(addDays(weekStart, 7))}>Próxima semana</button>
           </div>
           <p className="chart-caption"><span className="legend received" /> Recebidos <span className="legend delivered" /> Entregues</p>
-          {weekError ? <p className="error" role="alert">{weekError}</p> : weekLoading ? <p className="empty-state">Carregando semana...</p> : (
+          {loading ? <p className="empty-state">Carregando semana...</p> : unavailable ? (
+            <p className="empty-state">Evolução indisponível: falha ao ler o banco local.</p>
+          ) : (
             <div className="week-chart">
               {week.map((day) => (
                 <div className="week-day" key={day.date}>
@@ -254,12 +227,14 @@ export default function Home() {
 
         <section className="panel records-panel">
           <div className="records-heading">
-            <div><h2>Pedidos de {monthLabel(month)}</h2><p className="muted">{loading ? "Carregando..." : `${filteredRecords.length.toLocaleString("pt-BR")} registros encontrados`}</p></div>
+            <div><h2>Pedidos de {monthLabel(month)}</h2><p className="muted">{loading ? "Carregando..." : unavailable ? "Dados indisponíveis" : `${filteredRecords.length.toLocaleString("pt-BR")} registros encontrados`}</p></div>
             <label className="search-field"><span className="sr-only">Buscar pedido, pessoa ou estação</span>
               <input onChange={(event) => { setSearch(event.target.value); setPage(0); }} placeholder="Buscar nos registros" type="search" value={search} />
             </label>
           </div>
-          {loading ? <p className="empty-state">Carregando...</p> : filteredRecords.length === 0 ? (
+          {loading ? <p className="empty-state">Carregando...</p> : unavailable ? (
+            <p className="empty-state">Pedidos indisponíveis: falha ao ler o banco local.</p>
+          ) : filteredRecords.length === 0 ? (
             <p className="empty-state">Nenhum pedido encontrado para os filtros selecionados.</p>
           ) : (
             <>
@@ -286,7 +261,7 @@ export default function Home() {
           )}
         </section>
         <section className="archive-note"><strong>Meses armazenados</strong>
-          <span>{months.length ? months.map((item) => `${monthLabel(item.month)} (${item.count.toLocaleString("pt-BR")})`).join(" · ") : "Nenhuma importação salva ainda"}</span>
+          <span>{loading ? "Carregando..." : unavailable ? "Dados indisponíveis" : months.length ? months.map((item) => `${monthLabel(item.month)} (${item.count.toLocaleString("pt-BR")})`).join(" · ") : "Nenhuma importação salva ainda"}</span>
         </section>
       </section>
     </main>
