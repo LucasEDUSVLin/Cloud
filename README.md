@@ -8,9 +8,11 @@ Painel para cruzar o relatório de mercadorias paradas da Shopee com um segundo 
 2. Selecione o CSV **status atualizado** com as colunas `Order ID`, `Status`, `Driver Name`, `Driver Phone`, `Current Station`, `Current Station Received Time` e `Delivered Time`.
 3. Clique em **Analisar arquivos**. O sistema cruza `TN` com `Order ID`, usando somente o relatório STUCK como lista de mercadorias. A operação substitui a lista salva anteriormente.
 
+Após a importação, o formulário fica oculto. Para carregar novos arquivos, clique em **Atualizar relatórios**; a lista anterior só é substituída após uma importação bem-sucedida.
+
 Os dois CSVs devem ter cabeçalhos, de 1 a 10.000 registros, até 10 MB cada, sem IDs vazios ou duplicados. O processamento verifica ambos antes de substituir os dados. Pedidos do STUCK sem status atualizado são destacados para verificação; pedidos adicionais no arquivo de status são contados, mas não entram na lista.
 
-O painel separa pedidos cujo status atualizado seja `Delivered` como entregues. Os demais aparecem como **não entregues**, com o status exatamente como está no CSV (sem tradução). Pedidos sem correspondência mostram "Sem status atualizado".
+O painel exibe, pesquisa e agrupa pelo `Status` do CSV de status atualizado, sem substituí-lo pelo status do relatório STUCK. Pedidos sem correspondência ou sem status nesse CSV mostram "Sem status atualizado". Pedidos cujo status atualizado seja `Delivered` aparecem como entregues; os demais aparecem como **não entregues**.
 
 O botão **Copiar TN (BR)**, ao lado do relatório STUCK, copia os códigos TN do arquivo selecionado (um por linha) para consultar o status atualizado na Shopee.
 

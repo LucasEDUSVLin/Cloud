@@ -35,6 +35,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [stuckFile, setStuckFile] = useState<File | null>(null);
   const [statusFile, setStatusFile] = useState<File | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [filter, setFilter] = useState<Filter>("open");
@@ -70,7 +71,7 @@ export default function Home() {
       .filter((record) => filterRecord(record, filter) &&
       (statusFilter === null || (record.updatedStatus ?? "") === statusFilter) && (!query || [
         record.tracking, record.city, record.operation, record.driver, record.updatedDriver,
-        record.updatedStatus ?? "", record.stuckStatus, record.station,
+        record.updatedStatus ?? "", record.station,
       ].some((value) => value.toLocaleLowerCase("pt-BR").includes(query))))
       .sort((a, b) => b.days - a.days || a.tracking.localeCompare(b.tracking));
   }, [snapshot, filter, search, statusFilter]);
@@ -120,6 +121,9 @@ export default function Home() {
       setStatusFilter(null);
       setSearch("");
       setPage(0);
+      setStuckFile(null);
+      setStatusFile(null);
+      setImportOpen(false);
       setNotice(`${result.records.length.toLocaleString("pt-BR")} mercadorias carregadas. O painel agora mostra somente o novo arquivo STUCK.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível importar os arquivos.");
@@ -137,7 +141,13 @@ export default function Home() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand"><span className="brand-mark small">S</span><span>STUCK</span></div>
+        <div className="brand">
+          <svg className="brand-icon" viewBox="0 0 64 64" aria-hidden="true">
+            <rect width="64" height="64" rx="15" fill="#ee4d2d" />
+            <path d="M15 22 32 13l17 9v20L32 51 15 42V22Zm0 0 17 9 17-9M32 31v20M23 17.8l17 9" fill="none" stroke="#fff" strokeWidth="3" strokeLinejoin="round" />
+          </svg>
+          <span>STUCK</span>
+        </div>
         <span className="topbar-caption">SHOPEE</span>
       </header>
       <section className="content">
@@ -147,12 +157,27 @@ export default function Home() {
             <h1>Acompanhamento de STUCK</h1>
             <p className="muted">Mercadorias do relatório STUCK com o status do arquivo atualizado.</p>
           </div>
+          {snapshot && (
+            <button type="button" className="secondary-button" aria-expanded={importOpen} disabled={busy}
+              aria-controls="import-reports"
+              onClick={() => {
+                if (importOpen) {
+                  setStuckFile(null);
+                  setStatusFile(null);
+                  setError("");
+                  setNotice("");
+                }
+                setImportOpen(!importOpen);
+              }}>
+              {importOpen ? "Fechar importação" : "Atualizar relatórios"}
+            </button>
+          )}
         </div>
         <div className="privacy-note">
           Os dados ficam somente neste navegador. Não são compartilhados e podem ser apagados ao limpar os dados do site.
         </div>
 
-        <section className="panel import-panel">
+        {!loading && (!snapshot || importOpen) && <section id="import-reports" className="panel import-panel">
           <div>
             <h2>Importar relatórios</h2>
             <p className="muted">Selecione o relatório STUCK e o CSV com os status atualizados. Uma nova importação substitui a lista anterior.</p>
@@ -173,7 +198,7 @@ export default function Home() {
               {busy ? "Processando..." : "Analisar arquivos"}
             </button>
           </form>
-        </section>
+        </section>}
 
         {error && <p className="error message" role="alert">{error}</p>}
         {notice && <p className="success message" role="status">{notice}</p>}
@@ -236,14 +261,13 @@ export default function Home() {
                 <>
                   <div className="table-scroll">
                     <table>
-                      <thead><tr><th>Rastreamento</th><th>Dias parados</th><th>Comparação com 15 dias</th><th>Status atualizado</th><th>Status no STUCK</th><th>Entregador (status)</th><th>Entregador (STUCK)</th><th>Cidade</th><th>Estação atual</th><th>Avaria</th><th>Valor</th></tr></thead>
+                      <thead><tr><th>Rastreamento</th><th>Dias parados</th><th>Comparação com 15 dias</th><th>Status atualizado</th><th>Entregador (status)</th><th>Entregador (STUCK)</th><th>Cidade</th><th>Estação atual</th><th>Avaria</th><th>Valor</th></tr></thead>
                       <tbody>{visible.map((row) => (
                         <tr key={row.tracking}>
                           <td className="order-id">{row.tracking}</td>
                           <td><strong>{row.days}</strong></td>
                           <td><span className={`risk-pill ${row.days > 15 && !delivered(row) ? "danger" : row.days === 15 && !delivered(row) ? "warning" : ""}`}>{delivered(row) ? "Delivered" : risk(row)}</span></td>
                           <td><span className="status-pill" title={row.updatedStatus ?? ""}>{statusLabel(row.updatedStatus)}</span></td>
-                          <td>{row.stuckStatus || "—"}</td>
                           <td>{row.updatedDriver || "—"}</td>
                           <td>{row.driver || "—"}</td>
                           <td>{row.city || "—"}</td>

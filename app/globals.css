@@ -33,6 +33,7 @@ h1, h2 { font-family: Arial, Helvetica, sans-serif; }
   background: #fff;
 }
 .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 800; }
+.brand-icon { display: block; width: 34px; height: 34px; flex: none; }
 .brand-mark {
   display: grid;
   width: 48px;

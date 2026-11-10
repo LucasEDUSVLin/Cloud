@@ -15,6 +15,8 @@ describe("relatórios STUCK", () => {
     expect(snapshot.records).toHaveLength(3);
     expect(delivered(snapshot.records[0])).toBe(true);
     expect(delivered(snapshot.records[1])).toBe(false);
+    expect(snapshot.records[0].updatedStatus).toBe("Delivered");
+    expect(snapshot.records[0].stuckStatus).toBe("Hub_Received");
     expect(snapshot.records[2].updatedStatus).toBeNull();
     expect(snapshot.unmatchedUpdates).toBe(1);
     expect(risk(snapshot.records[0])).toBe("15 dias");
