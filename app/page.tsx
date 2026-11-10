@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers, valueTotals, exportSelectedCsv } from "@/lib/stuck";
-import { readSnapshot, readTreatedTracking, saveSnapshot, setTrackingTreated } from "@/lib/stuck-storage";
+import { readSnapshot, readTreatments, saveSnapshot, setTrackingTreatment } from "@/lib/stuck-storage";
+import { isTreatment, TREATMENT_OPTIONS, type Treatment } from "@/lib/treatment";
 
-type Filter = "pending" | "treated" | "overdue" | "unmatched" | "all";
+type Filter = "unclassified" | "classified" | "overdue" | "unmatched" | "all";
 const PAGE_SIZE = 50;
 const currencyFormat = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -21,9 +22,9 @@ function formatTime(date: string) {
   return Number.isNaN(parsed.getTime()) ? "Data indisponível" : parsed.toLocaleString("pt-BR");
 }
 
-function filterRecord(record: StuckRecord, filter: Filter, treated: ReadonlySet<string>) {
-  if (filter === "pending") return !treated.has(record.tracking);
-  if (filter === "treated") return treated.has(record.tracking);
+function filterRecord(record: StuckRecord, filter: Filter, treatments: ReadonlyMap<string, Treatment>) {
+  if (filter === "unclassified") return !treatments.has(record.tracking);
+  if (filter === "classified") return treatments.has(record.tracking);
   if (filter === "overdue") return record.days > 15;
   if (filter === "unmatched") return !record.updatedStatus;
   return true;
@@ -38,22 +39,22 @@ export default function Home() {
   const [importOpen, setImportOpen] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [filter, setFilter] = useState<Filter>("pending");
+  const [filter, setFilter] = useState<Filter>("all");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [treated, setTreated] = useState<Set<string>>(() => new Set());
+  const [treatments, setTreatments] = useState<Map<string, Treatment>>(() => new Map());
   const [treatmentReady, setTreatmentReady] = useState(false);
   const [savingTreatment, setSavingTreatment] = useState(false);
 
   useEffect(() => {
     let active = true;
-    Promise.all([readSnapshot(), readTreatedTracking()])
-      .then(([result, treatedTracking]) => {
+    Promise.all([readSnapshot(), readTreatments()])
+      .then(([result, savedTreatments]) => {
         if (active) {
           setSnapshot(result);
-          setTreated(treatedTracking);
+          setTreatments(savedTreatments);
           setTreatmentReady(true);
         }
       })
@@ -66,25 +67,25 @@ export default function Home() {
     const records = snapshot?.records ?? [];
     return {
       total: records.length,
-      pending: records.filter((row) => !treated.has(row.tracking)).length,
-      treated: records.filter((row) => treated.has(row.tracking)).length,
+      unclassified: records.filter((row) => !treatments.has(row.tracking)).length,
+      classified: records.filter((row) => treatments.has(row.tracking)).length,
       overdue: records.filter((row) => row.days > 15).length,
       limit: records.filter((row) => row.days === 15).length,
       unmatched: records.filter((row) => !row.updatedStatus).length,
     };
-  }, [snapshot, treated]);
+  }, [snapshot, treatments]);
   const amounts = useMemo(() => valueTotals(snapshot?.records ?? []), [snapshot]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
     return (snapshot?.records ?? [])
-      .filter((record) => filterRecord(record, filter, treated) &&
+      .filter((record) => filterRecord(record, filter, treatments) &&
       (statusFilter === null || (record.updatedStatus ?? "") === statusFilter) && (!query || [
-        record.tracking, record.city, record.operation, record.driver, record.updatedDriver,
+        record.tracking, record.city, record.operation, record.updatedDriver,
         record.updatedStatus ?? "", record.station,
       ].some((value) => value.toLocaleLowerCase("pt-BR").includes(query))))
       .sort((a, b) => b.days - a.days || a.tracking.localeCompare(b.tracking));
-  }, [snapshot, filter, search, statusFilter, treated]);
+  }, [snapshot, filter, search, statusFilter, treatments]);
   const statuses = useMemo(() => {
     const groups = new Map<string, number>();
     for (const record of snapshot?.records ?? []) {
@@ -129,7 +130,7 @@ export default function Home() {
       const result = processStuckFiles(stuckCsv, statusCsv);
       await saveSnapshot(result);
       setSnapshot(result);
-      setFilter("pending");
+      setFilter("all");
       setStatusFilter(null);
       setSearch("");
       setPage(0);
@@ -151,18 +152,23 @@ export default function Home() {
     setPage(0);
   }
 
-  async function handleTreatment(record: StuckRecord, checked: boolean) {
+  async function handleTreatment(record: StuckRecord, value: string) {
     setError("");
+    if (value !== "" && !isTreatment(value)) {
+      setError("Classificação de tratamento inválida.");
+      return;
+    }
+    const treatment = value === "" ? null : value;
     setSavingTreatment(true);
     try {
-      await setTrackingTreated(record.tracking, checked);
-      setTreated((previous) => {
-        const next = new Set(previous);
-        if (checked) next.add(record.tracking);
+      await setTrackingTreatment(record.tracking, treatment);
+      setTreatments((previous) => {
+        const next = new Map(previous);
+        if (treatment !== null) next.set(record.tracking, treatment);
         else next.delete(record.tracking);
         return next;
       });
-      if (((filter === "pending" && checked) || (filter === "treated" && !checked)) && visible.length === 1 && page > 0) {
+      if (((filter === "unclassified" && treatment !== null) || (filter === "classified" && treatment === null)) && visible.length === 1 && page > 0) {
         setPage((previous) => previous - 1);
       }
     } catch (caught) {
@@ -264,8 +270,8 @@ export default function Home() {
             </div>
             <div className="metric-grid">
               <Metric label="No relatório STUCK" value={counts.total} />
-              <Metric label="Pendentes de tratamento" value={counts.pending} />
-              <Metric label="Marcadas como tratadas" value={counts.treated} />
+              <Metric label="Sem classificação" value={counts.unclassified} />
+              <Metric label="Classificadas" value={counts.classified} />
               <Metric label="Acima de 15 dias" value={counts.overdue} />
               <Metric label="Valor total no relatório STUCK" value={formatCurrency(amounts.totalCents)} />
               <Metric label="Débito por status LOST" value={formatCurrency(amounts.lostCents)} />
@@ -273,7 +279,7 @@ export default function Home() {
             <div className="summary-notes">
               <p><strong>{counts.limit}</strong> mercadoria(s) com exatamente 15 dias. <strong>{counts.unmatched}</strong> sem status atualizado correspondente.</p>
               {snapshot.unmatchedUpdates > 0 && <p>{snapshot.unmatchedUpdates} pedido(s) do arquivo de status não constam no relatório STUCK e foram ignorados.</p>}
-              <p>O tratamento é marcado manualmente e não depende do status da Shopee. Os dias são os do arquivo STUCK e não aumentam automaticamente.</p>
+              <p>O tratamento é classificado manualmente e não depende do status da Shopee. Os dias são os do arquivo STUCK e não aumentam automaticamente.</p>
             </div>
 
             <section className="panel">
@@ -303,8 +309,8 @@ export default function Home() {
               </div>
               <div className="filter-bar" aria-label="Filtros de mercadorias">
                 {([
-                  ["pending", `Pendentes (${counts.pending})`],
-                  ["treated", `Tratadas (${counts.treated})`],
+                  ["unclassified", `Sem classificação (${counts.unclassified})`],
+                  ["classified", `Classificadas (${counts.classified})`],
                   ["overdue", `Acima de 15 dias (${counts.overdue})`],
                   ["unmatched", `Sem status atualizado (${counts.unmatched})`],
                   ["all", `Todos (${counts.total})`],
@@ -327,7 +333,7 @@ export default function Home() {
                 <>
                   <div className="table-scroll">
                     <table>
-                      <thead><tr><th>Selecionar para exportação</th><th>Rastreamento</th><th>Tratamento</th><th>Dias parados</th><th>Comparação com 15 dias</th><th>Status atualizado</th><th>Entregador (status)</th><th>Entregador (STUCK)</th><th>Cidade</th><th>Estação atual</th><th>Avaria</th><th>Valor</th></tr></thead>
+                      <thead><tr><th><span className="sr-only">Selecionar para exportação</span></th><th>Rastreamento</th><th>Tratamento</th><th>Dias parados</th><th>Comparação com 15 dias</th><th>Status atualizado</th><th>Entregador</th><th>Cidade</th><th>Estação atual</th><th>Avaria</th><th>Valor</th></tr></thead>
                       <tbody>{visible.map((row) => (
                         <tr key={row.tracking}>
                           <td><input type="checkbox" aria-label={`Selecionar ${row.tracking}`} checked={selected.has(row.tracking)} disabled={!snapshot.exportFields}
@@ -341,16 +347,16 @@ export default function Home() {
                               });
                             }} /></td>
                           <td className="order-id">{row.tracking}</td>
-                          <td><label className="treatment-control">
-                            <input type="checkbox" aria-label={`Marcar ${row.tracking} como tratada`} checked={treated.has(row.tracking)} disabled={savingTreatment || busy}
-                              onChange={(event) => handleTreatment(row, event.target.checked)} />
-                            {treated.has(row.tracking) ? "Tratada" : "Pendente"}
-                          </label></td>
+                          <td><select className="treatment-control" aria-label={`Tratamento ${row.tracking}`}
+                            value={treatments.get(row.tracking) ?? ""} disabled={savingTreatment || busy}
+                            onChange={(event) => handleTreatment(row, event.target.value)}>
+                            <option value="">Sem classificação</option>
+                            {TREATMENT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                          </select></td>
                           <td><strong>{row.days}</strong></td>
                           <td><span className={`risk-pill ${row.days > 15 ? "danger" : row.days === 15 ? "warning" : ""}`}>{risk(row)}</span></td>
                           <td><span className="status-pill" title={row.updatedStatus ?? ""}>{statusLabel(row.updatedStatus)}</span></td>
                           <td>{row.updatedDriver || "—"}</td>
-                          <td>{row.driver || "—"}</td>
                           <td>{row.city || "—"}</td>
                           <td>{row.station || "—"}</td>
                           <td>{row.damage || "—"}</td>

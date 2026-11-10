@@ -1,7 +1,8 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { processStuckFiles } from "./stuck";
-import { readSnapshot, readTreatedTracking, saveSnapshot, setTrackingTreated } from "./stuck-storage";
+import { readSnapshot, readTreatments, saveSnapshot, setTrackingTreatment } from "./stuck-storage";
+import { TREATMENT_OPTIONS } from "./treatment";
 
 const status = "Order ID,Status,Driver Name,Driver Phone,Current Station,Current Station Received Time,Delivered Time\nA,Delivered,,,Station,,";
 const stuck = "Operação,Cidade,Entegador,TN,Status,Dias parados,Valor,Palavra Chave,Avaria\nX,Cidade,Nome,A,OnHold,3,10,null,Não";
@@ -28,21 +29,54 @@ describe("banco local de STUCK", () => {
 
   it("mantém o tratamento por TN mesmo quando sai da lista e retorna", async () => {
     await saveSnapshot(processStuckFiles(stuck, status));
-    await setTrackingTreated("A", true);
-    expect(await readTreatedTracking()).toEqual(new Set(["A"]));
+    await setTrackingTreatment("A", "Em análise");
+    expect(await readTreatments()).toEqual(new Map([["A", "Em análise"]]));
     await saveSnapshot(processStuckFiles(stuck.replace(",A,", ",B,"), status.replace("A,Delivered", "B,Delivered")));
-    expect(await readTreatedTracking()).toEqual(new Set(["A"]));
+    expect(await readTreatments()).toEqual(new Map([["A", "Em análise"]]));
     await saveSnapshot(processStuckFiles(stuck, status));
-    expect(await readTreatedTracking()).toEqual(new Set(["A"]));
-    await setTrackingTreated("A", false);
-    expect(await readTreatedTracking()).toEqual(new Set());
+    expect(await readTreatments()).toEqual(new Map([["A", "Em análise"]]));
+    await setTrackingTreatment("A", null);
+    expect(await readTreatments()).toEqual(new Map());
     expect((await readSnapshot())?.records[0].tracking).toBe("A");
   });
 
   it("salva as marcações de TNs diferentes sem sobrescrever outras", async () => {
-    await Promise.all([setTrackingTreated("A", true), setTrackingTreated("B", true)]);
-    expect(await readTreatedTracking()).toEqual(new Set(["A", "B"]));
-    await setTrackingTreated("A", false);
-    expect(await readTreatedTracking()).toEqual(new Set(["B"]));
+    await Promise.all([setTrackingTreatment("A", "Perdido"), setTrackingTreatment("B", "Entregue")]);
+    expect(await readTreatments()).toEqual(new Map([["A", "Perdido"], ["B", "Entregue"]]));
+    await setTrackingTreatment("A", null);
+    expect(await readTreatments()).toEqual(new Map([["B", "Entregue"]]));
+  });
+
+  it("salva e altera cada uma das opções", async () => {
+    for (const option of TREATMENT_OPTIONS) {
+      await setTrackingTreatment("A", option);
+      expect((await readTreatments()).get("A")).toBe(option);
+    }
+  });
+
+  it("remove somente as antigas marcações, sem apagar o relatório ou classificações novas", async () => {
+    const snapshot = processStuckFiles(stuck, status);
+    await saveSnapshot(snapshot);
+    await setTrackingTreatment("B", "Débito base");
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("stuck-monitor", 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction("snapshots", "readwrite");
+      transaction.objectStore("snapshots").put(true, "treated:A");
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(transaction.error);
+    });
+    expect(await readTreatments()).toEqual(new Map([["B", "Débito base"]]));
+    const legacy = await new Promise<unknown>((resolve, reject) => {
+      const request = db.transaction("snapshots").objectStore("snapshots").get("treated:A");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    expect(legacy).toBeUndefined();
+    expect(await readSnapshot()).toEqual(snapshot);
   });
 });

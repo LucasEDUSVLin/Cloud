@@ -78,7 +78,8 @@ h1, h2 { font-family: Arial, Helvetica, sans-serif; }
 .selection-bar span, .export-note { color: var(--muted); font-size: 13px; line-height: 1.5; }
 .selection-bar .text-button:disabled { opacity: .5; cursor: not-allowed; }
 td input[type="checkbox"] { accent-color: var(--accent); }
-.treatment-control { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+.treatment-control { min-height: 36px; max-width: 190px; padding: 6px 8px; border: 1px solid #e6d5cc; border-radius: 7px; background: white; color: var(--ink); cursor: pointer; }
+.treatment-control:disabled { opacity: .6; cursor: wait; }
 .risk-pill { display: inline-block; padding: 4px 8px; border-radius: 99px; background: #f9eee8; color: #66544c; font-size: 11px; }
 .risk-pill.warning { background: #fff1d2; color: #8a5700; }
 .risk-pill.danger { background: #ffebea; color: #a72f2f; }
