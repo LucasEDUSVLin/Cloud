@@ -143,21 +143,12 @@ export default function Home() {
       <header className="topbar">
         <div className="brand">
           <svg className="brand-icon" viewBox="0 0 64 64" aria-hidden="true">
-            <rect width="64" height="64" rx="15" fill="#ee4d2d" />
+            <rect width="64" height="64" rx="15" fill="#c94b2c" />
             <path d="M15 22 32 13l17 9v20L32 51 15 42V22Zm0 0 17 9 17-9M32 31v20M23 17.8l17 9" fill="none" stroke="#fff" strokeWidth="3" strokeLinejoin="round" />
           </svg>
-          <span>STUCK</span>
+          <h1>STUCK</h1>
         </div>
-        <span className="topbar-caption">SHOPEE</span>
-      </header>
-      <section className="content">
-        <div className="page-heading">
-          <div>
-            <p className="eyebrow">PAINEL DE OPERAÇÕES</p>
-            <h1>Acompanhamento de STUCK</h1>
-            <p className="muted">Mercadorias do relatório STUCK com o status do arquivo atualizado.</p>
-          </div>
-          {snapshot && (
+        {snapshot && (
             <button type="button" className="secondary-button" aria-expanded={importOpen} disabled={busy}
               aria-controls="import-reports"
               onClick={() => {
@@ -171,8 +162,9 @@ export default function Home() {
               }}>
               {importOpen ? "Fechar importação" : "Atualizar relatórios"}
             </button>
-          )}
-        </div>
+        )}
+      </header>
+      <section className="content">
         <div className="privacy-note">
           Os dados ficam somente neste navegador. Não são compartilhados e podem ser apagados ao limpar os dados do site.
         </div>
