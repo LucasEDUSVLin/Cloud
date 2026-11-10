@@ -2,6 +2,7 @@ import type { StuckSnapshot } from "./stuck";
 
 const DATABASE = "stuck-monitor";
 const STORE = "snapshots";
+const TREATMENT_PREFIX = "treated:";
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -49,4 +50,37 @@ export async function readSnapshot(): Promise<StuckSnapshot | null> {
   } finally {
     db.close();
   }
+}
+
+export async function readTreatedTracking(): Promise<Set<string>> {
+const db = await openDatabase();
+try {
+  return await new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE, "readonly");
+    const request = transaction.objectStore(STORE).getAllKeys();
+    request.onsuccess = () => resolve(new Set(request.result
+      .filter((key): key is string => typeof key === "string" && key.startsWith(TREATMENT_PREFIX))
+      .map((key) => key.slice(TREATMENT_PREFIX.length))));
+    request.onerror = () => reject(new Error("Não foi possível ler os tratamentos salvos."));
+    transaction.onabort = () => reject(new Error("A leitura dos tratamentos foi interrompida."));
+  });
+} finally {
+  db.close();
+}
+}
+
+export async function setTrackingTreated(tracking: string, treated: boolean): Promise<void> {
+const db = await openDatabase();
+try {
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORE, "readwrite");
+    const store = transaction.objectStore(STORE);
+    if (treated) store.put(true, TREATMENT_PREFIX + tracking);
+    else store.delete(TREATMENT_PREFIX + tracking);
+    transaction.oncomplete = () => resolve();
+    transaction.onabort = () => reject(new Error("Não foi possível salvar o tratamento. Verifique o espaço no navegador."));
+  });
+} finally {
+  db.close();
+}
 }
