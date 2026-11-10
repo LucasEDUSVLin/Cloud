@@ -77,6 +77,11 @@ export default function Home() {
   }, [snapshot, treatments]);
   const amounts = useMemo(() => valueTotals(snapshot?.records ?? []), [snapshot]);
   const charts = useMemo(() => chartCounts(snapshot?.records ?? [], treatments), [snapshot, treatments]);
+  const heatmapMax = useMemo(() => {
+    let max = 0;
+    for (const row of charts.byStatus.values()) max = Math.max(max, row.below, row.atLimit, row.above);
+    return max;
+  }, [charts]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
@@ -151,6 +156,13 @@ export default function Home() {
   function selectFilter(value: Filter) {
     setFilter(value);
     setStatusFilter(null);
+    setPage(0);
+    setSelected(new Set());
+  }
+
+  function selectStatus(status: string) {
+    setFilter("all");
+    setStatusFilter(statusFilter === status ? null : status);
     setPage(0);
     setSelected(new Set());
   }
@@ -292,19 +304,36 @@ export default function Home() {
               <div className="charts-grid">
                 <div>
                   <h3>Dias parados</h3>
-                  <p className="chart-description">Comparação com 15 dias usando os dados importados.</p>
-                  <ChartBar label="Abaixo de 15 dias" count={charts.days.below} total={counts.total} color="below" />
-                  <ChartBar label="Exatamente 15 dias" count={charts.days.atLimit} total={counts.total} color="warning" />
-                  <ChartBar label="Acima de 15 dias" count={charts.days.above} total={counts.total} color="danger" />
+                  <p className="chart-description">Distribuição por comparação com 15 dias.</p>
+                  <DaysPie days={charts.days} total={counts.total} />
                   <p className="chart-description">As cores indicam apenas a comparação de dias; não determinam status LOST ou débito.</p>
                 </div>
                 <div>
                   <h3>Classificação de tratamento</h3>
                   <p className="chart-description">Classificações manuais salvas neste navegador; não indicam conclusão.</p>
-                  <ChartBar label="Sem classificação" count={charts.unclassified} total={counts.total} color="unclassified" />
-                  {TREATMENT_OPTIONS.map((option) => (
-                    <ChartBar key={option} label={option} count={charts.classification.get(option) ?? 0} total={counts.total} color="classified" />
-                  ))}
+                  <TreatmentBars items={[
+                    { label: "Sem classificação", count: charts.unclassified },
+                    ...TREATMENT_OPTIONS.map((option) => ({ label: option, count: charts.classification.get(option) ?? 0 })),
+                  ]} />
+                </div>
+              </div>
+              <div className="heatmap-section">
+                <h3>Mapa de calor: status atualizado × dias parados</h3>
+                <p className="chart-description">Cada célula mostra a quantidade de mercadorias; quanto mais forte a cor, maior a quantidade em relação às demais células. Selecione um status para filtrar a tabela de mercadorias.</p>
+                <div className="heatmap-scroll">
+                  <table className="heatmap">
+                    <thead><tr><th scope="col">Status atualizado</th><th scope="col">Abaixo de 15 dias</th><th scope="col">Exatamente 15 dias</th><th scope="col">Acima de 15 dias</th></tr></thead>
+                    <tbody>{statuses.map(([status]) => {
+                      const row = charts.byStatus.get(status);
+                      if (!row) return null;
+                      return <tr key={status}>
+                        <th scope="row"><button type="button" className="heatmap-status" aria-pressed={statusFilter === status} onClick={() => selectStatus(status)}>{statusLabel(status || null)}</button></th>
+                        {[row.below, row.atLimit, row.above].map((count, index) => (
+                          <td key={index}><span className={`heat-cell heat-${count ? Math.ceil(count * 4 / heatmapMax) : 0}`}>{count.toLocaleString("pt-BR")}</span></td>
+                        ))}
+                      </tr>;
+                    })}</tbody>
+                  </table>
                 </div>
               </div>
             </section>
@@ -318,7 +347,7 @@ export default function Home() {
                 {statuses.map(([status, count]) => (
                   <button key={status} className={`status-card ${statusFilter === status ? "active" : ""}`}
                     type="button" aria-pressed={statusFilter === status}
-                    onClick={() => { setFilter("all"); setStatusFilter(statusFilter === status ? null : status); setPage(0); setSelected(new Set()); }}>
+                    onClick={() => selectStatus(status)}>
                     <span>{statusLabel(status || null)}</span><strong>{count.toLocaleString("pt-BR")}</strong>
                     <span className="status-value">Valor: {formatCurrency(amounts.byStatus.get(status) ?? 0)}</span>
                     <span className="status-track"><span style={{ width: `${count * 100 / counts.total}%` }} /></span>
@@ -411,12 +440,36 @@ function Metric({ label, value }: { label: string; value: number | string }) {
   return <article className="metric-card"><p>{label}</p><strong>{typeof value === "number" ? value.toLocaleString("pt-BR") : value}</strong></article>;
 }
 
-function ChartBar({ label, count, total, color }: { label: string; count: number; total: number; color: "below" | "warning" | "danger" | "unclassified" | "classified" }) {
-  const percentage = total ? count * 100 / total : 0;
+function DaysPie({ days, total }: { days: { below: number; atLimit: number; above: number }; total: number }) {
+  const slices = [
+    { label: "Abaixo de 15 dias", count: days.below, color: "#82736c" },
+    { label: "Exatamente 15 dias", count: days.atLimit, color: "#b97a08" },
+    { label: "Acima de 15 dias", count: days.above, color: "#b53636" },
+  ];
+  const below = total ? days.below * 100 / total : 0;
+  const atLimit = total ? (days.below + days.atLimit) * 100 / total : 0;
   return (
-    <div className="chart-row">
-      <div className="chart-row-label"><span>{label}</span><strong>{count.toLocaleString("pt-BR")} <span>({percentage.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)</span></strong></div>
-      <div className="chart-track" aria-hidden="true"><div className={`chart-fill ${color}`} style={{ width: `${percentage}%` }} /></div>
+    <div className="pie-layout">
+      <div className="pie-chart" aria-hidden="true" style={{ background: total ? `conic-gradient(#82736c 0% ${below}%, #b97a08 ${below}% ${atLimit}%, #b53636 ${atLimit}% 100%)` : "#f3eae5" }} />
+      <ul className="pie-legend">{slices.map(({ label, count, color }) => (
+        <li key={label}><span className="pie-swatch" style={{ background: color }} aria-hidden="true" /><span>{label}<br /><strong>{count.toLocaleString("pt-BR")} ({(total ? count * 100 / total : 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)</strong></span></li>
+      ))}</ul>
+    </div>
+  );
+}
+
+function TreatmentBars({ items }: { items: { label: string; count: number }[] }) {
+  const max = Math.max(0, ...items.map((item) => item.count));
+  return (
+    <div className="vertical-chart-scroll">
+      <div className="vertical-chart" aria-label="Quantidade por classificação de tratamento">
+        {items.map(({ label, count }, index) => (
+          <div className="vertical-item" key={label}>
+            <div className="vertical-plot"><strong>{count.toLocaleString("pt-BR")}</strong><div className={`vertical-bar ${index === 0 ? "unclassified" : ""}`} style={{ height: `${max ? count * 145 / max : 0}px` }} /></div>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
