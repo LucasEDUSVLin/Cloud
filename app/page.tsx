@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers, valueTotals, exportSelectedCsv } from "@/lib/stuck";
 import { readSnapshot, readTreatments, saveSnapshot, setTrackingTreatment } from "@/lib/stuck-storage";
 import { isTreatment, TREATMENT_OPTIONS, type Treatment } from "@/lib/treatment";
+import { chartCounts } from "@/lib/visualization";
 
 type Filter = "unclassified" | "classified" | "overdue" | "unmatched" | "all";
 const PAGE_SIZE = 50;
@@ -75,6 +76,7 @@ export default function Home() {
     };
   }, [snapshot, treatments]);
   const amounts = useMemo(() => valueTotals(snapshot?.records ?? []), [snapshot]);
+  const charts = useMemo(() => chartCounts(snapshot?.records ?? [], treatments), [snapshot, treatments]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
@@ -283,6 +285,30 @@ export default function Home() {
               <p>O tratamento é classificado manualmente e não depende do status da Shopee. Os dias são os do arquivo STUCK e não aumentam automaticamente.</p>
             </div>
 
+            <section className="panel charts-panel">
+              <div className="records-heading">
+                <div><h2>Visualização dos STUCKs</h2><p className="muted">Distribuição de todas as mercadorias do relatório atual, independentemente dos filtros.</p></div>
+              </div>
+              <div className="charts-grid">
+                <div>
+                  <h3>Dias parados</h3>
+                  <p className="chart-description">Comparação com 15 dias usando os dados importados.</p>
+                  <ChartBar label="Abaixo de 15 dias" count={charts.days.below} total={counts.total} color="below" />
+                  <ChartBar label="Exatamente 15 dias" count={charts.days.atLimit} total={counts.total} color="warning" />
+                  <ChartBar label="Acima de 15 dias" count={charts.days.above} total={counts.total} color="danger" />
+                  <p className="chart-description">As cores indicam apenas a comparação de dias; não determinam status LOST ou débito.</p>
+                </div>
+                <div>
+                  <h3>Classificação de tratamento</h3>
+                  <p className="chart-description">Classificações manuais salvas neste navegador; não indicam conclusão.</p>
+                  <ChartBar label="Sem classificação" count={charts.unclassified} total={counts.total} color="unclassified" />
+                  {TREATMENT_OPTIONS.map((option) => (
+                    <ChartBar key={option} label={option} count={charts.classification.get(option) ?? 0} total={counts.total} color="classified" />
+                  ))}
+                </div>
+              </div>
+            </section>
+
             <section className="panel">
               <div className="records-heading">
                 <div><h2>Status atualizados</h2><p className="muted">Distribuição dos pedidos do relatório STUCK. Selecione um status para filtrar.</p></div>
@@ -355,7 +381,7 @@ export default function Home() {
                             {TREATMENT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
                           </select></td>
                           <td><strong>{row.days}</strong></td>
-                          <td><span className={`risk-pill ${row.days > 15 ? "danger" : row.days === 15 ? "warning" : ""}`}>{risk(row)}</span></td>
+                          <td><span className={`risk-pill ${row.days > 15 ? "danger" : row.days === 15 ? "warning" : "below"}`}>{risk(row)}</span></td>
                           <td><span className="status-pill" title={row.updatedStatus ?? ""}>{statusLabel(row.updatedStatus)}</span></td>
                           <td>{row.updatedDriver || "—"}</td>
                           <td>{row.city || "—"}</td>
@@ -383,4 +409,14 @@ export default function Home() {
 
 function Metric({ label, value }: { label: string; value: number | string }) {
   return <article className="metric-card"><p>{label}</p><strong>{typeof value === "number" ? value.toLocaleString("pt-BR") : value}</strong></article>;
+}
+
+function ChartBar({ label, count, total, color }: { label: string; count: number; total: number; color: "below" | "warning" | "danger" | "unclassified" | "classified" }) {
+  const percentage = total ? count * 100 / total : 0;
+  return (
+    <div className="chart-row">
+      <div className="chart-row-label"><span>{label}</span><strong>{count.toLocaleString("pt-BR")} <span>({percentage.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)</span></strong></div>
+      <div className="chart-track" aria-hidden="true"><div className={`chart-fill ${color}`} style={{ width: `${percentage}%` }} /></div>
+    </div>
+  );
 }

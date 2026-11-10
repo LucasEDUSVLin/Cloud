@@ -24,6 +24,8 @@ O botão **Copiar TN (BR)**, ao lado do relatório STUCK, copia os códigos TN d
 
 O indicador de dias usa exclusivamente `Dias parados` do relatório STUCK, sem incrementar os dias após a importação. O painel apenas compara esse número com 15 dias (abaixo, igual ou acima); não infere LOST nem débito. Nenhum dado é criado: tudo vem dos CSVs.
 
+Os gráficos apresentam quantidades e percentuais de todo o relatório atual, sem aplicar os filtros da tabela: um compara os dias parados com 15 dias e o outro distribui as classificações manuais, incluindo as mercadorias sem classificação. Cinza indica abaixo de 15 dias, amarelo exatamente 15 e vermelho acima de 15; a mesma sinalização aparece na tabela. As cores de dias não indicam status LOST nem débito, e classificação manual não significa tratamento concluído.
+
 Os indicadores financeiros somam o campo `Valor` do relatório STUCK em reais: o total inclui todos os registros da lista, e a distribuição por status usa o `Status` do CSV atualizado. O débito por LOST considera somente registros cujo status atualizado seja exatamente `LOST` (sem diferenciar maiúsculas de minúsculas); dias parados acima de 15 não são tratados como LOST. Valores fora do formato numérico com ponto decimal e até duas casas são rejeitados para evitar totais incorretos.
 
 ## Privacidade e armazenamento

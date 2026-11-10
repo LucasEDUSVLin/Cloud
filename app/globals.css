@@ -81,6 +81,7 @@ td input[type="checkbox"] { accent-color: var(--accent); }
 .treatment-control { min-height: 36px; max-width: 190px; padding: 6px 8px; border: 1px solid #e6d5cc; border-radius: 7px; background: white; color: var(--ink); cursor: pointer; }
 .treatment-control:disabled { opacity: .6; cursor: wait; }
 .risk-pill { display: inline-block; padding: 4px 8px; border-radius: 99px; background: #f9eee8; color: #66544c; font-size: 11px; }
+.risk-pill.below { background: #f0eeec; color: #514844; }
 .risk-pill.warning { background: #fff1d2; color: #8a5700; }
 .risk-pill.danger { background: #ffebea; color: #a72f2f; }
 .upload-button { position: relative; overflow: hidden; flex: 0 0 auto; }
@@ -114,6 +115,19 @@ td input[type="checkbox"] { accent-color: var(--accent); }
 .records-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
 .panel h2 { margin: 0; font-size: 16px; }
 .panel .muted { margin: 7px 0 0; font-size: 13px; }
+.charts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+.charts-grid h3 { margin: 0; font-size: 14px; }
+.chart-description { margin: 8px 0 16px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.chart-row { margin-bottom: 12px; }
+.chart-row-label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 5px; font-size: 12px; }
+.chart-row-label strong { flex: none; }
+.chart-row-label strong span { color: var(--muted); font-weight: 400; }
+.chart-track { height: 9px; overflow: hidden; border-radius: 9px; background: #f3eae5; }
+.chart-fill { height: 100%; border-radius: inherit; }
+.chart-fill.below, .chart-fill.unclassified { background: #82736c; }
+.chart-fill.warning { background: #b97a08; }
+.chart-fill.danger { background: #b53636; }
+.chart-fill.classified { background: var(--accent); }
 .text-button { padding: 8px; border: 0; background: transparent; color: var(--accent); font-weight: 700; }
 .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
 .status-card { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); text-align: left; }
@@ -166,6 +180,7 @@ tbody tr:hover { background: #fffaf7; }
   .topbar { height: 64px; padding: 0 16px; }
   .section-title { align-items: flex-start; flex-direction: column; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .charts-grid { grid-template-columns: 1fr; gap: 24px; }
   .metric-card { min-height: 112px; padding: 16px; }
   .metric-card p { margin-bottom: 18px; font-size: 12px; }
   .panel { padding: 16px 12px; }
