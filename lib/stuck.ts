@@ -18,12 +18,20 @@ export type StuckRecord = {
   station: string;
   receivedTime: string;
   deliveredTime: string;
+  source?: {
+    stuck: Record<string, string>;
+    updated: Record<string, string> | null;
+  };
 };
 
 export type StuckSnapshot = {
   records: StuckRecord[];
   unmatchedUpdates: number;
   importedAt: string;
+  exportFields?: {
+    stuck: string[];
+    updated: string[];
+  };
 };
 
 function parseFile(csv: string, columns: readonly string[], label: string) {
@@ -42,7 +50,7 @@ function parseFile(csv: string, columns: readonly string[], label: string) {
   if (!parsed.data.length || parsed.data.length > 10_000) {
     throw new Error(`${label}: o arquivo deve conter de 1 a 10.000 registros.`);
   }
-  return parsed.data;
+  return { rows: parsed.data, fields };
 }
 
 function uniqueMap(rows: Record<string, string>[], column: string, label: string) {
@@ -57,10 +65,10 @@ function uniqueMap(rows: Record<string, string>[], column: string, label: string
 }
 
 export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSnapshot {
-  const stuckRows = parseFile(stuckCsv, STUCK_COLUMNS, "Arquivo STUCK");
-  const updatedRows = parseFile(updatedCsv, UPDATED_COLUMNS, "Arquivo de status");
-  const stuck = uniqueMap(stuckRows, "TN", "Arquivo STUCK");
-  const updates = uniqueMap(updatedRows, "Order ID", "Arquivo de status");
+  const stuckFile = parseFile(stuckCsv, STUCK_COLUMNS, "Arquivo STUCK");
+  const updatedFile = parseFile(updatedCsv, UPDATED_COLUMNS, "Arquivo de status");
+  const stuck = uniqueMap(stuckFile.rows, "TN", "Arquivo STUCK");
+  const updates = uniqueMap(updatedFile.rows, "Order ID", "Arquivo de status");
   const records = [...stuck].map(([tracking, row], index): StuckRecord => {
     const rawDays = (row["Dias parados"] ?? "").trim();
     if (!/^\d+$/.test(rawDays) || !Number.isSafeInteger(Number(rawDays))) {
@@ -89,18 +97,39 @@ export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSn
       station: (update?.["Current Station"] ?? "").trim(),
       receivedTime: (update?.["Current Station Received Time"] ?? "").trim(),
       deliveredTime: (update?.["Delivered Time"] ?? "").trim(),
+      source: { stuck: row, updated: update ?? null },
     };
   });
   return {
     records,
     unmatchedUpdates: [...updates.keys()].filter((id) => !stuck.has(id)).length,
     importedAt: new Date().toISOString(),
+    exportFields: { stuck: stuckFile.fields, updated: updatedFile.fields },
   };
 }
 
 export function extractTrackingNumbers(stuckCsv: string) {
-  const rows = parseFile(stuckCsv, STUCK_COLUMNS, "Arquivo STUCK");
-  return [...uniqueMap(rows, "TN", "Arquivo STUCK").keys()];
+  const file = parseFile(stuckCsv, STUCK_COLUMNS, "Arquivo STUCK");
+  return [...uniqueMap(file.rows, "TN", "Arquivo STUCK").keys()];
+}
+
+export function exportSelectedCsv(snapshot: StuckSnapshot, selected: ReadonlySet<string>) {
+  const fields = snapshot.exportFields;
+  if (!fields) throw new Error("Importe novamente os dois relatórios para exportar todas as colunas.");
+  const records = snapshot.records.filter((record) => selected.has(record.tracking));
+  if (!records.length) throw new Error("Selecione pelo menos uma mercadoria para exportar.");
+  const data = records.map((record) => {
+    const source = record.source;
+    if (!source) throw new Error("Importe novamente os dois relatórios para exportar todas as colunas.");
+    return [
+      ...fields.stuck.map((field) => source.stuck[field] ?? ""),
+      ...fields.updated.map((field) => source.updated?.[field] ?? ""),
+    ];
+  });
+  return "\uFEFF" + Papa.unparse({
+    fields: [...fields.stuck.map((field) => `STUCK - ${field}`), ...fields.updated.map((field) => `Status atualizado - ${field}`)],
+    data,
+  }, { delimiter: ";", newline: "\r\n", escapeFormulae: /^[\t\r\n]|^[\s]*[=+\-@]/ });
 }
 
 export function parseValueCents(value: string) {

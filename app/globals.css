@@ -74,6 +74,10 @@ h1, h2 { font-family: Arial, Helvetica, sans-serif; }
 .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .filter-bar button { padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: white; color: #64534c; font-size: 12px; }
 .filter-bar button.active { border-color: var(--accent); background: #fff2eb; color: #a9361d; font-weight: 700; }
+.selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 16px; }
+.selection-bar span, .export-note { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.selection-bar .text-button:disabled { opacity: .5; cursor: not-allowed; }
+td input[type="checkbox"] { accent-color: var(--accent); }
 .risk-pill { display: inline-block; padding: 4px 8px; border-radius: 99px; background: #f9eee8; color: #66544c; font-size: 11px; }
 .risk-pill.warning { background: #fff1d2; color: #8a5700; }
 .risk-pill.danger { background: #ffebea; color: #a72f2f; }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { delivered, processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers, valueTotals } from "@/lib/stuck";
+import { delivered, processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers, valueTotals, exportSelectedCsv } from "@/lib/stuck";
 import { readSnapshot, saveSnapshot } from "@/lib/stuck-storage";
 
 type Filter = "open" | "delivered" | "overdue" | "unmatched" | "all";
@@ -42,6 +42,7 @@ export default function Home() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     let active = true;
@@ -85,6 +86,8 @@ export default function Home() {
   }, [snapshot]);
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
   const visible = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const selectedInFilter = filtered.filter((record) => selected.has(record.tracking)).length;
+  const allFilteredSelected = filtered.length > 0 && selectedInFilter === filtered.length;
 
   async function handleCopyTn() {
     if (!stuckFile) return;
@@ -121,6 +124,7 @@ export default function Home() {
       setStatusFilter(null);
       setSearch("");
       setPage(0);
+      setSelected(new Set());
       setStuckFile(null);
       setStatusFile(null);
       setImportOpen(false);
@@ -136,6 +140,35 @@ export default function Home() {
     setFilter(value);
     setStatusFilter(null);
     setPage(0);
+  }
+
+  function toggleFilteredSelection() {
+    setSelected((previous) => {
+      const next = new Set(previous);
+      for (const record of filtered) {
+        if (allFilteredSelected) next.delete(record.tracking);
+        else next.add(record.tracking);
+      }
+      return next;
+    });
+  }
+
+  function handleExport() {
+    if (!snapshot) return;
+    setError("");
+    try {
+      const csv = exportSelectedCsv(snapshot, selected);
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "stuck-mercadorias-selecionadas.csv";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível exportar as mercadorias.");
+    }
   }
 
   return (
@@ -166,7 +199,7 @@ export default function Home() {
       </header>
       <section className="content">
         <div className="privacy-note">
-          Os dados ficam somente neste navegador. Não são compartilhados e podem ser apagados ao limpar os dados do site.
+          Os dados do relatório STUCK e das linhas correspondentes do arquivo de status, inclusive eventuais dados pessoais, ficam neste navegador para permitir a exportação. Proteja também os arquivos CSV baixados.
         </div>
 
         {!loading && (!snapshot || importOpen) && <section id="import-reports" className="panel import-panel">
@@ -249,13 +282,34 @@ export default function Home() {
                   <button key={key} type="button" className={filter === key ? "active" : ""} aria-pressed={filter === key} onClick={() => selectFilter(key)}>{label}</button>
                 ))}
               </div>
+              <div className="selection-bar">
+                <button type="button" className="secondary-button" disabled={!filtered.length || !snapshot.exportFields}
+                  onClick={toggleFilteredSelection}>
+                  {allFilteredSelected ? "Desmarcar resultados filtrados" : "Selecionar resultados filtrados"}
+                </button>
+                <span aria-live="polite">{selected.size.toLocaleString("pt-BR")} selecionada(s), incluindo outras páginas e filtros.</span>
+                <button type="button" className="text-button" disabled={!selected.size} onClick={() => setSelected(new Set())}>Limpar seleção</button>
+                <button type="button" className="primary-button" disabled={!selected.size || !snapshot.exportFields} onClick={handleExport}>Exportar selecionadas (CSV)</button>
+              </div>
+              {!snapshot.exportFields && <p className="export-note">Para exportar todas as colunas, clique em Atualizar relatórios e importe novamente os dois arquivos.</p>}
+              {snapshot.exportFields && <p className="export-note">O CSV inclui todas as colunas dos dois relatórios. Valores que possam ser interpretados como fórmulas recebem um apóstrofo por segurança.</p>}
               {visible.length === 0 ? <p className="empty-state">Nenhuma mercadoria encontrada neste filtro.</p> : (
                 <>
                   <div className="table-scroll">
                     <table>
-                      <thead><tr><th>Rastreamento</th><th>Dias parados</th><th>Comparação com 15 dias</th><th>Status atualizado</th><th>Entregador (status)</th><th>Entregador (STUCK)</th><th>Cidade</th><th>Estação atual</th><th>Avaria</th><th>Valor</th></tr></thead>
+                      <thead><tr><th>Selecionar</th><th>Rastreamento</th><th>Dias parados</th><th>Comparação com 15 dias</th><th>Status atualizado</th><th>Entregador (status)</th><th>Entregador (STUCK)</th><th>Cidade</th><th>Estação atual</th><th>Avaria</th><th>Valor</th></tr></thead>
                       <tbody>{visible.map((row) => (
                         <tr key={row.tracking}>
+                          <td><input type="checkbox" aria-label={`Selecionar ${row.tracking}`} checked={selected.has(row.tracking)} disabled={!snapshot.exportFields}
+                            onChange={(event) => {
+                              const checked = event.target.checked;
+                              setSelected((previous) => {
+                                const next = new Set(previous);
+                                if (checked) next.add(row.tracking);
+                                else next.delete(row.tracking);
+                                return next;
+                              });
+                            }} /></td>
                           <td className="order-id">{row.tracking}</td>
                           <td><strong>{row.days}</strong></td>
                           <td><span className={`risk-pill ${row.days > 15 && !delivered(row) ? "danger" : row.days === 15 && !delivered(row) ? "warning" : ""}`}>{delivered(row) ? "Delivered" : risk(row)}</span></td>

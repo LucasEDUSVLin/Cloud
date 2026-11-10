@@ -10,6 +10,10 @@ Painel para cruzar o relatório de mercadorias paradas da Shopee com um segundo 
 
 Após a importação, o formulário fica oculto. Para carregar novos arquivos, clique em **Atualizar relatórios**; a lista anterior só é substituída após uma importação bem-sucedida.
 
+Na seção **Mercadorias**, marque pedidos individualmente ou selecione todos os resultados dos filtros e da busca, incluindo outras páginas. A seleção permanece ao trocar de filtro; use **Limpar seleção** para removê-la. A exportação inclui todos os itens selecionados, mesmo os ocultos pelo filtro atual, e uma nova importação limpa a seleção.
+
+O CSV exportado combina todas as colunas dos dois relatórios com prefixos `STUCK -` e `Status atualizado -`. Sem correspondência, as colunas de status atualizado ficam vazias. O arquivo usa UTF-8 com BOM e ponto e vírgula como separador. Para evitar execução de fórmulas no Excel ou Planilhas, valores que possam ser interpretados como fórmulas recebem um apóstrofo inicial. Ao importar no Excel ou Planilhas, escolha tipo texto para códigos, telefones e outros identificadores para evitar conversão automática. Para exportar dados de importações anteriores a esta função, reimporte os dois arquivos.
+
 Os dois CSVs devem ter cabeçalhos, de 1 a 10.000 registros, até 10 MB cada, sem IDs vazios ou duplicados. O processamento verifica ambos antes de substituir os dados. Pedidos do STUCK sem status atualizado são destacados para verificação; pedidos adicionais no arquivo de status são contados, mas não entram na lista.
 
 O painel exibe, pesquisa e agrupa pelo `Status` do CSV de status atualizado, sem substituí-lo pelo status do relatório STUCK. Pedidos sem correspondência ou sem status nesse CSV mostram "Sem status atualizado". Pedidos cujo status atualizado seja `Delivered` aparecem como entregues; os demais aparecem como **não entregues**.
@@ -22,7 +26,7 @@ Os indicadores financeiros somam o campo `Valor` do relatório STUCK em reais: o
 
 ## Privacidade e armazenamento
 
-O site funciona sem login. Os dois CSVs são processados localmente e os campos necessários são salvos no IndexedDB do navegador; não são enviados ao GitHub. Outra pessoa com acesso ao mesmo perfil de navegador pode ver os dados. Eles não são sincronizados entre computadores, podem ser apagados ao limpar os dados do site e não substituem backups protegidos dos arquivos originais.
+O site funciona sem login. Todos os campos dos registros do relatório STUCK e das linhas correspondentes do arquivo de status são processados e salvos no IndexedDB do navegador para permitir a exportação; eles podem conter dados pessoais. Os dados não são enviados ao GitHub, mas outra pessoa com acesso ao mesmo perfil de navegador pode vê-los. Os arquivos CSV baixados devem ser protegidos separadamente. Os dados não são sincronizados entre computadores, podem ser apagados ao limpar os dados do site e não substituem backups protegidos dos arquivos originais.
 
 O banco da versão anterior não é removido nem migrado; o novo painel usa um banco separado. Sites em caminhos diferentes sob o mesmo domínio `github.io` compartilham a mesma origem e podem acessar o armazenamento uns dos outros. Para proteger dados pessoais, prefira um domínio dedicado e um dispositivo e perfil de navegador de acesso restrito.
 
