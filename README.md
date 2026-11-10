@@ -10,7 +10,7 @@ Painel para cruzar o relatório de mercadorias paradas da Shopee com um segundo 
 
 Após a importação, o formulário fica oculto. Para carregar novos arquivos, clique em **Atualizar relatórios**; a lista anterior só é substituída após uma importação bem-sucedida.
 
-Na seção **Mercadorias**, marque pedidos individualmente ou selecione todos os resultados dos filtros e da busca, incluindo outras páginas. A seleção permanece ao trocar de filtro; use **Limpar seleção** para removê-la. A exportação inclui todos os itens selecionados, mesmo os ocultos pelo filtro atual, e uma nova importação limpa a seleção.
+Na seção **Mercadorias**, marque pedidos individualmente ou selecione todos os resultados dos filtros e da busca, incluindo outras páginas. A seleção é limpa ao trocar de filtro, status ou busca, então **Selecionar resultados filtrados** e a exportação sempre se referem apenas ao que está filtrado. Use **Limpar seleção** para removê-la; uma nova importação também a limpa.
 
 O CSV exportado combina todas as colunas dos dois relatórios com prefixos `STUCK -` e `Status atualizado -`. Sem correspondência, as colunas de status atualizado ficam vazias. O arquivo usa UTF-8 com BOM e ponto e vírgula como separador. Para evitar execução de fórmulas no Excel ou Planilhas, valores que possam ser interpretados como fórmulas recebem um apóstrofo inicial. Ao importar no Excel ou Planilhas, escolha tipo texto para códigos, telefones e outros identificadores para evitar conversão automática. Para exportar dados de importações anteriores a esta função, reimporte os dois arquivos.
 

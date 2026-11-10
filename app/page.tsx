@@ -150,6 +150,7 @@ export default function Home() {
     setFilter(value);
     setStatusFilter(null);
     setPage(0);
+    setSelected(new Set());
   }
 
   async function handleTreatment(record: StuckRecord, value: string) {
@@ -285,13 +286,13 @@ export default function Home() {
             <section className="panel">
               <div className="records-heading">
                 <div><h2>Status atualizados</h2><p className="muted">Distribuição dos pedidos do relatório STUCK. Selecione um status para filtrar.</p></div>
-                {statusFilter !== null && <button className="text-button" onClick={() => { setStatusFilter(null); setPage(0); }}>Limpar status</button>}
+                {statusFilter !== null && <button className="text-button" onClick={() => { setStatusFilter(null); setPage(0); setSelected(new Set()); }}>Limpar status</button>}
               </div>
               <div className="status-grid">
                 {statuses.map(([status, count]) => (
                   <button key={status} className={`status-card ${statusFilter === status ? "active" : ""}`}
                     type="button" aria-pressed={statusFilter === status}
-                    onClick={() => { setFilter("all"); setStatusFilter(statusFilter === status ? null : status); setPage(0); }}>
+                    onClick={() => { setFilter("all"); setStatusFilter(statusFilter === status ? null : status); setPage(0); setSelected(new Set()); }}>
                     <span>{statusLabel(status || null)}</span><strong>{count.toLocaleString("pt-BR")}</strong>
                     <span className="status-value">Valor: {formatCurrency(amounts.byStatus.get(status) ?? 0)}</span>
                     <span className="status-track"><span style={{ width: `${count * 100 / counts.total}%` }} /></span>
@@ -304,7 +305,7 @@ export default function Home() {
               <div className="records-heading">
                 <div><h2>Mercadorias</h2><p className="muted">{filtered.length.toLocaleString("pt-BR")} registro(s) encontrados{statusFilter !== null ? ` — ${statusLabel(statusFilter || null)}` : ""}. Ordenados por dias parados.</p></div>
                 <label className="search-field"><span className="sr-only">Buscar pedido, cidade, entregador ou status</span>
-                  <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} type="search" placeholder="Buscar nas mercadorias" />
+                  <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); setSelected(new Set()); }} type="search" placeholder="Buscar nas mercadorias" />
                 </label>
               </div>
               <div className="filter-bar" aria-label="Filtros de mercadorias">
@@ -323,7 +324,7 @@ export default function Home() {
                   onClick={toggleFilteredSelection}>
                   {allFilteredSelected ? "Desmarcar resultados filtrados" : "Selecionar resultados filtrados"}
                 </button>
-                <span aria-live="polite">{selected.size.toLocaleString("pt-BR")} selecionada(s), incluindo outras páginas e filtros.</span>
+                <span aria-live="polite">{selected.size.toLocaleString("pt-BR")} selecionada(s) no filtro atual, incluindo outras páginas.</span>
                 <button type="button" className="text-button" disabled={!selected.size} onClick={() => setSelected(new Set())}>Limpar seleção</button>
                 <button type="button" className="primary-button" disabled={!selected.size || !snapshot.exportFields} onClick={handleExport}>Exportar selecionadas (CSV)</button>
               </div>
