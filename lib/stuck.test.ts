@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Papa from "papaparse";
-import { delivered, exportSelectedCsv, extractTrackingNumbers, parseValueCents, processStuckFiles, risk, valueTotals } from "./stuck";
+import { delivered, exportFilename, exportSelectedCsv, extractTrackingNumbers, parseValueCents, processStuckFiles, risk, valueTotals } from "./stuck";
 
 const stuckHeader = "Operação,Cidade,Entegador,TN,Status,Dias parados,Valor,Palavra Chave,Avaria";
 const statusHeader = "Order ID,Status,Driver Name,Driver Phone,Current Station,Current Station Received Time,Delivered Time";
@@ -8,6 +8,11 @@ const stuckRow = (id: string, days: string) => `OP,Cidade,Motorista,${id},Hub_Re
 const statusRow = (id: string, status: string) => `${id},${status},Pessoa,,Estação,,`;
 
 describe("relatórios STUCK", () => {
+  it("nomeia o arquivo usando a data e hora locais da exportação", () => {
+    expect(exportFilename(new Date(2026, 10, 11, 12, 55))).toBe("Stuck-11-11-2026-12-55.csv");
+    expect(exportFilename(new Date(2026, 0, 2, 3, 4))).toBe("Stuck-02-01-2026-03-04.csv");
+  });
+
   it("cruza por TN e Order ID, conserva apenas a lista STUCK e distingue entregues", () => {
     const snapshot = processStuckFiles(
       [stuckHeader, stuckRow("A", "15"), stuckRow("B", "16"), stuckRow("C", "3")].join("\n"),

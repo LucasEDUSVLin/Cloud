@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers, valueTotals, exportSelectedCsv } from "@/lib/stuck";
+import { processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers, valueTotals, exportSelectedCsv, exportFilename } from "@/lib/stuck";
 import { readSnapshot, readTreatments, saveSnapshot, setTrackingTreatment } from "@/lib/stuck-storage";
 import { isTreatment, TREATMENT_OPTIONS, type Treatment } from "@/lib/treatment";
 import { chartCounts } from "@/lib/visualization";
@@ -238,7 +238,7 @@ export default function Home() {
       const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
       const link = document.createElement("a");
       link.href = url;
-      link.download = "stuck-mercadorias-selecionadas.csv";
+      link.download = exportFilename(new Date());
       document.body.appendChild(link);
       link.click();
       link.remove();

@@ -122,6 +122,11 @@ export function extractTrackingNumbers(stuckCsv: string) {
   return [...uniqueMap(file.rows, "TN", "Arquivo STUCK").keys()];
 }
 
+export function exportFilename(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `Stuck-${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}-${pad(date.getHours())}-${pad(date.getMinutes())}.csv`;
+}
+
 export function exportSelectedCsv(snapshot: StuckSnapshot, selected: ReadonlySet<string>) {
   const fields = snapshot.exportFields;
   if (!fields) throw new Error("Importe novamente os dois relatórios para exportar as informações atualizadas.");

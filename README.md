@@ -16,6 +16,8 @@ Na seção **Mercadorias**, marque pedidos individualmente ou selecione todos os
 
 O CSV exportado contém apenas as colunas e linhas do arquivo de status atualizado correspondentes aos BRs selecionados, com os cabeçalhos originais e sem prefixos. Se algum BR selecionado não possuir linha correspondente, a exportação é bloqueada e os BRs são informados. O arquivo usa UTF-8 com BOM e ponto e vírgula como separador. Para evitar execução de fórmulas no Excel ou Planilhas, células ou cabeçalhos que possam ser interpretados como fórmulas recebem um apóstrofo inicial. Ao importar no Excel ou Planilhas, escolha tipo texto para códigos, telefones e outros identificadores para evitar conversão automática. Em relatórios importados antes desta alteração, eventuais espaços nos extremos dos cabeçalhos já foram removidos; reimporte os arquivos para preservá-los.
 
+O nome do arquivo segue o formato `Stuck-DD-MM-AAAA-HH-MM.csv`, com a data e o horário locais do dispositivo no momento da exportação.
+
 Os dois CSVs devem ter cabeçalhos, de 1 a 10.000 registros, até 10 MB cada, sem IDs vazios ou duplicados. O processamento verifica ambos antes de substituir os dados. Pedidos do STUCK sem status atualizado são destacados para verificação; pedidos adicionais no arquivo de status são contados, mas não entram na lista.
 
 O painel exibe, pesquisa e agrupa pelo `Status` do CSV de status atualizado, sem substituí-lo pelo status do relatório STUCK. Pedidos sem correspondência ou sem status nesse CSV mostram "Sem status atualizado".
