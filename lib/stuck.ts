@@ -31,14 +31,23 @@ export type StuckSnapshot = {
   exportFields?: {
     stuck: string[];
     updated: string[];
+    updatedOriginal?: string[];
+  };
+  files?: {
+    stuck: { name: string; contents: string };
+    updated: { name: string; contents: string };
   };
 };
 
 function parseFile(csv: string, columns: readonly string[], label: string) {
+  const originalFields: string[] = [];
   const parsed = Papa.parse<Record<string, string>>(csv.replace(/^\uFEFF/, ""), {
     header: true,
     skipEmptyLines: "greedy",
-    transformHeader: (header) => header.trim(),
+    transformHeader: (header, index) => {
+      originalFields[index] = header;
+      return header.trim();
+    },
   });
   if (parsed.errors.length) throw new Error(`${label}: ${parsed.errors[0].message}`);
   const fields = parsed.meta.fields ?? [];
@@ -50,7 +59,7 @@ function parseFile(csv: string, columns: readonly string[], label: string) {
   if (!parsed.data.length || parsed.data.length > 10_000) {
     throw new Error(`${label}: o arquivo deve conter de 1 a 10.000 registros.`);
   }
-  return { rows: parsed.data, fields };
+  return { rows: parsed.data, fields, originalFields };
 }
 
 function uniqueMap(rows: Record<string, string>[], column: string, label: string) {
@@ -104,7 +113,7 @@ export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSn
     records,
     unmatchedUpdates: [...updates.keys()].filter((id) => !stuck.has(id)).length,
     importedAt: new Date().toISOString(),
-    exportFields: { stuck: stuckFile.fields, updated: updatedFile.fields },
+    exportFields: { stuck: stuckFile.fields, updated: updatedFile.fields, updatedOriginal: updatedFile.originalFields },
   };
 }
 
@@ -115,19 +124,19 @@ export function extractTrackingNumbers(stuckCsv: string) {
 
 export function exportSelectedCsv(snapshot: StuckSnapshot, selected: ReadonlySet<string>) {
   const fields = snapshot.exportFields;
-  if (!fields) throw new Error("Importe novamente os dois relatórios para exportar todas as colunas.");
+  if (!fields) throw new Error("Importe novamente os dois relatórios para exportar as informações atualizadas.");
   const records = snapshot.records.filter((record) => selected.has(record.tracking));
   if (!records.length) throw new Error("Selecione pelo menos uma mercadoria para exportar.");
+  if (records.some((record) => !record.source)) throw new Error("Importe novamente os dois relatórios para exportar as informações atualizadas.");
+  const missing = records.filter((record) => !record.source?.updated).map((record) => record.tracking);
+  if (missing.length) throw new Error(`Sem dados atualizados para os seguintes BRs: ${missing.join(", ")}. Atualize o relatório de status antes de exportar.`);
   const data = records.map((record) => {
-    const source = record.source;
-    if (!source) throw new Error("Importe novamente os dois relatórios para exportar todas as colunas.");
-    return [
-      ...fields.stuck.map((field) => source.stuck[field] ?? ""),
-      ...fields.updated.map((field) => source.updated?.[field] ?? ""),
-    ];
+    const updated = record.source?.updated;
+    if (!updated) throw new Error(`Sem dados atualizados para ${record.tracking}.`);
+    return fields.updated.map((field) => updated[field] ?? "");
   });
   return "\uFEFF" + Papa.unparse({
-    fields: [...fields.stuck.map((field) => `STUCK - ${field}`), ...fields.updated.map((field) => `Status atualizado - ${field}`)],
+    fields: fields.updatedOriginal ?? fields.updated,
     data,
   }, { delimiter: ";", newline: "\r\n", escapeFormulae: /^[\t\r\n]|^[\s]*[=+\-@]/ });
 }

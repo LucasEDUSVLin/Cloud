@@ -48,6 +48,28 @@ export default function Home() {
   const [treatments, setTreatments] = useState<Map<string, Treatment>>(() => new Map());
   const [treatmentReady, setTreatmentReady] = useState(false);
   const [savingTreatment, setSavingTreatment] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [themeError, setThemeError] = useState("");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("stuck-theme");
+      if (saved === "dark" || saved === "light") setTheme(saved);
+    } catch {
+      setThemeError("Não foi possível carregar a preferência de tema neste navegador.");
+    }
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === "light" ? "dark" : "light";
+    setTheme(next);
+    try {
+      localStorage.setItem("stuck-theme", next);
+      setThemeError("");
+    } catch {
+      setThemeError("Não foi possível salvar a preferência de tema neste navegador.");
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -107,11 +129,13 @@ export default function Home() {
   const allFilteredSelected = filtered.length > 0 && selectedInFilter === filtered.length;
 
   async function handleCopyTn() {
-    if (!stuckFile) return;
+    if (!stuckFile && !snapshot?.files?.stuck) return;
     setError("");
     setNotice("");
     try {
-      const codes = extractTrackingNumbers(await stuckFile.text());
+      const contents = stuckFile ? await stuckFile.text() : snapshot?.files?.stuck.contents;
+      if (contents === undefined) throw new Error("Selecione o relatório STUCK.");
+      const codes = extractTrackingNumbers(contents);
       await navigator.clipboard.writeText(codes.join("\n"));
       setNotice(`${codes.length} código(s) TN copiados.`);
     } catch (caught) {
@@ -123,18 +147,20 @@ export default function Home() {
     event.preventDefault();
     setError("");
     setNotice("");
-    if (!stuckFile || !statusFile) {
+    if ((!stuckFile && !snapshot?.files?.stuck) || (!statusFile && !snapshot?.files?.updated)) {
       setError("Selecione os dois arquivos CSV.");
       return;
     }
-    if ([stuckFile, statusFile].some((file) => !file.name.toLowerCase().endsWith(".csv") || file.size > 10 * 1024 * 1024)) {
+    if ([stuckFile, statusFile].some((file) => file && (!file.name.toLowerCase().endsWith(".csv") || file.size > 10 * 1024 * 1024))) {
       setError("Selecione dois arquivos CSV de até 10 MB cada.");
       return;
     }
     setBusy(true);
     try {
-      const [stuckCsv, statusCsv] = await Promise.all([stuckFile.text(), statusFile.text()]);
-      const result = processStuckFiles(stuckCsv, statusCsv);
+      const stuck = stuckFile ? { name: stuckFile.name, contents: await stuckFile.text() } : snapshot?.files?.stuck;
+      const updated = statusFile ? { name: statusFile.name, contents: await statusFile.text() } : snapshot?.files?.updated;
+      if (!stuck || !updated) throw new Error("Selecione os dois arquivos CSV.");
+      const result = { ...processStuckFiles(stuck.contents, updated.contents), files: { stuck, updated } };
       await saveSnapshot(result);
       setSnapshot(result);
       setFilter("all");
@@ -223,7 +249,7 @@ export default function Home() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-theme={theme}>
       <header className="topbar">
         <div className="brand">
           <svg className="brand-icon" viewBox="0 0 64 64" aria-hidden="true">
@@ -232,6 +258,10 @@ export default function Home() {
           </svg>
           <h1>STUCK</h1>
         </div>
+        <div className="topbar-actions">
+          <button type="button" className="secondary-button theme-toggle" onClick={toggleTheme} aria-label={`Mudar para tema ${theme === "light" ? "escuro" : "claro"}`}>
+            {theme === "light" ? "Tema escuro" : "Tema claro"}
+          </button>
         {snapshot && (
             <button type="button" className="secondary-button" aria-expanded={importOpen} disabled={busy || savingTreatment}
               aria-controls="import-reports"
@@ -247,30 +277,34 @@ export default function Home() {
               {importOpen ? "Fechar importação" : "Atualizar relatórios"}
             </button>
         )}
+        </div>
       </header>
       <section className="content">
         <div className="privacy-note">
           Os relatórios e as marcações de tratamento ficam somente neste navegador. Não são compartilhados e podem ser apagados ao limpar os dados do site. Proteja os arquivos CSV baixados, que podem conter dados pessoais.
         </div>
+        {themeError && <p className="error message" role="alert">{themeError}</p>}
 
         {!loading && (!snapshot || importOpen) && <section id="import-reports" className="panel import-panel">
           <div>
             <h2>Importar relatórios</h2>
-            <p className="muted">Selecione o relatório STUCK e o CSV com os status atualizados. Uma nova importação substitui a lista anterior.</p>
+            <p className="muted">Selecione o relatório STUCK e o CSV com os status atualizados. Os arquivos salvos podem ser reutilizados; selecione apenas os que deseja substituir.</p>
           </div>
           <form onSubmit={handleImport} className="import-form">
             <div className="file-row">
               <label className="file-field">
                 <span>1. Relatório STUCK da Shopee</span>
+                {snapshot?.files?.stuck && <span className="saved-file">Salvo: {snapshot.files.stuck.name}</span>}
                 <input type="file" accept=".csv,text/csv" onChange={(event) => setStuckFile(event.target.files?.[0] ?? null)} disabled={busy} />
               </label>
-              <button type="button" className="secondary-button" onClick={handleCopyTn} disabled={busy || !stuckFile}>Copiar TN (BR)</button>
+              <button type="button" className="secondary-button" onClick={handleCopyTn} disabled={busy || (!stuckFile && !snapshot?.files?.stuck)}>Copiar TN (BR)</button>
             </div>
             <label className="file-field">
               <span>2. Status atualizado dos pedidos</span>
+              {snapshot?.files?.updated && <span className="saved-file">Salvo: {snapshot.files.updated.name}</span>}
               <input type="file" accept=".csv,text/csv" onChange={(event) => setStatusFile(event.target.files?.[0] ?? null)} disabled={busy} />
             </label>
-            <button type="submit" className="primary-button" disabled={busy || loading || savingTreatment || !treatmentReady || !stuckFile || !statusFile}>
+            <button type="submit" className="primary-button" disabled={busy || loading || savingTreatment || !treatmentReady || (!stuckFile && !snapshot?.files?.stuck) || (!statusFile && !snapshot?.files?.updated) || (!stuckFile && !statusFile)}>
               {busy ? "Processando..." : "Analisar arquivos"}
             </button>
           </form>
@@ -383,8 +417,8 @@ export default function Home() {
                 <button type="button" className="text-button" disabled={!selected.size} onClick={() => setSelected(new Set())}>Limpar seleção</button>
                 <button type="button" className="primary-button" disabled={!selected.size || !snapshot.exportFields} onClick={handleExport}>Exportar selecionadas (CSV)</button>
               </div>
-              {!snapshot.exportFields && <p className="export-note">Para exportar todas as colunas, clique em Atualizar relatórios e importe novamente os dois arquivos.</p>}
-              {snapshot.exportFields && <p className="export-note">O CSV inclui todas as colunas dos dois relatórios. Valores que possam ser interpretados como fórmulas recebem um apóstrofo por segurança.</p>}
+              {!snapshot.exportFields && <p className="export-note">Para exportar, clique em Atualizar relatórios e importe novamente os dois arquivos.</p>}
+              {snapshot.exportFields && <p className="export-note">O CSV inclui apenas as colunas do arquivo de status atualizado. Mercadorias sem correspondência impedem a exportação. Valores que possam ser interpretados como fórmulas recebem um apóstrofo por segurança.</p>}
               {visible.length === 0 ? <p className="empty-state">Nenhuma mercadoria encontrada neste filtro.</p> : (
                 <>
                   <div className="table-scroll">

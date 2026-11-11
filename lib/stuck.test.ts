@@ -61,26 +61,26 @@ describe("relatórios STUCK", () => {
     expect(parseValueCents("910.8")).toBe(91080);
   });
 
-  it("exporta somente selecionados com todas as colunas, preservando textos e sem inventar status", () => {
+  it("exporta apenas os dados atualizados selecionados com os cabeçalhos originais", () => {
     const snapshot = processStuckFiles(
-      `${stuckHeader},Detalhe\n${stuckRow("A", "1")},"texto; com vírgula, aspas ""e quebra\nlinha"""\n${stuckRow("B", "2")},outro`,
-      `${statusHeader},Nota extra\n${statusRow("A", "Delivered")},=1+1`,
+      `${stuckHeader}\n${stuckRow("A", "1")}\n${stuckRow("B", "2")}`,
+      `${statusHeader}, Nota extra \n${statusRow("A", "Delivered")},"texto; com vírgula, aspas ""e quebra\nlinha"""`,
     );
-    const csv = exportSelectedCsv(snapshot, new Set(["A", "B"]));
+    const csv = exportSelectedCsv(snapshot, new Set(["A"]));
     expect(csv.startsWith("\uFEFF")).toBe(true);
     const parsed = Papa.parse<Record<string, string>>(csv.slice(1), { header: true, delimiter: ";", skipEmptyLines: true });
     expect(parsed.errors).toEqual([]);
-    expect(parsed.data).toHaveLength(2);
-    expect(parsed.meta.fields).toHaveLength(18);
-    expect(parsed.data[0]["STUCK - Detalhe"]).toBe('texto; com vírgula, aspas "e quebra\nlinha"');
-    expect(parsed.data[0]["STUCK - Status"]).toBe("Hub_Received");
-    expect(parsed.data[0]["Status atualizado - Status"]).toBe("Delivered");
-    expect(parsed.data[0]["Status atualizado - Nota extra"]).toBe("'=1+1");
-    expect(parsed.data[1]["Status atualizado - Order ID"]).toBe("");
-    expect(parsed.data[1]["Status atualizado - Status"]).toBe("");
-    expect(Papa.parse(exportSelectedCsv(snapshot, new Set(["B"])).slice(1), { header: true, delimiter: ";" }).data).toHaveLength(1);
+    expect(parsed.data).toHaveLength(1);
+    expect(parsed.meta.fields).toEqual([...statusHeader.split(","), " Nota extra "]);
+    expect(parsed.data[0][" Nota extra "]).toBe('texto; com vírgula, aspas "e quebra\nlinha"');
+    expect(parsed.data[0].Status).toBe("Delivered");
+    expect(parsed.data[0]["Order ID"]).toBe("A");
+    expect(() => exportSelectedCsv(snapshot, new Set(["A", "B"]))).toThrow("B");
+    expect(() => exportSelectedCsv(snapshot, new Set(["B"]))).toThrow("Sem dados atualizados");
     expect(() => exportSelectedCsv(snapshot, new Set())).toThrow("Selecione");
     expect(() => exportSelectedCsv({ ...snapshot, exportFields: undefined }, new Set(["A"]))).toThrow("Importe novamente");
+    const legacy = { ...snapshot, exportFields: { stuck: snapshot.exportFields!.stuck, updated: snapshot.exportFields!.updated } };
+    expect(Papa.parse(exportSelectedCsv(legacy, new Set(["A"])).slice(1), { header: true, delimiter: ";" }).meta.fields).toEqual([...statusHeader.split(","), "Nota extra"]);
   });
 
   it("protege células que possam ser interpretadas como fórmulas", () => {
@@ -89,8 +89,8 @@ describe("relatórios STUCK", () => {
       `${statusHeader},Extra1,Extra2,Extra3\n${statusRow("A", "OnHold")}, +1,\tvalor,-9`,
     );
     const parsed = Papa.parse<Record<string, string>>(exportSelectedCsv(snapshot, new Set(["A"])).slice(1), { header: true, delimiter: ";" });
-    expect(parsed.data[0]["Status atualizado - Extra1"]).toBe("' +1");
-    expect(parsed.data[0]["Status atualizado - Extra2"]).toBe("'\tvalor");
-    expect(parsed.data[0]["Status atualizado - Extra3"]).toBe("'-9");
+    expect(parsed.data[0].Extra1).toBe("' +1");
+    expect(parsed.data[0].Extra2).toBe("'\tvalor");
+    expect(parsed.data[0].Extra3).toBe("'-9");
   });
 });

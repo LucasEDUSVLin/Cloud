@@ -17,7 +17,10 @@ beforeEach(async () => {
 
 describe("banco local de STUCK", () => {
   it("persiste e substitui somente após receber os dois arquivos válidos", async () => {
-    const first = processStuckFiles(stuck, status);
+    const first = {
+      ...processStuckFiles(stuck, status),
+      files: { stuck: { name: "stuck.csv", contents: stuck }, updated: { name: "status.csv", contents: status } },
+    };
     await saveSnapshot(first);
     expect(await readSnapshot()).toEqual(first);
     expect(() => processStuckFiles("invalido", status)).toThrow();
