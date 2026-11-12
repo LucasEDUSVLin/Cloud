@@ -44,7 +44,14 @@ describe("relatórios STUCK", () => {
     const csv = [stuckHeader, 'OP,"Cidade\nCentro",Motorista,A,Hub_Received,3,22.41,null,Não', "", stuckRow("B", "-1")].join("\n");
     expect(() => processStuckFiles(csv, status)).toThrow("Dias parados inválido na linha 5");
     expect(() => processStuckFiles(csv.replace(stuckRow("B", "-1"), stuckRow("A", "1")), status)).toThrow("TN duplicado na linha 5");
-    expect(() => processStuckFiles(csv.replace(stuckRow("B", "-1"), "OP,Cidade"), status)).toThrow("Arquivo STUCK, linha 5");
+    expect(() => processStuckFiles(csv.replace(stuckRow("B", "-1"), "OP,Cidade"), status)).toThrow("Arquivo STUCK, linha 5: Número de colunas incorreto. Confira os separadores.");
+  });
+
+  it("apresenta erros de leitura do CSV em português", () => {
+    const status = [statusHeader, statusRow("A", "Delivered")].join("\n");
+    expect(() => processStuckFiles(`${stuckHeader}\nOP,"Cidade`, status)).toThrow("Arquivo STUCK: Aspas não fechadas. Confira o CSV.");
+    expect(() => processStuckFiles([stuckHeader, stuckRow("A", "1").replace("22.41", "abc")].join("\n"), status))
+      .toThrow("Valor inválido na linha 2. Use ponto decimal e até 2 casas.");
   });
 
   it("rejeita uma soma que ultrapasse a precisão inteira mesmo com valores individuais válidos", () => {

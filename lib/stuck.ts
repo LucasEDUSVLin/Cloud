@@ -83,7 +83,17 @@ function parseFile(csv: string, columns: readonly string[], label: string) {
   const parseError = parsed.errors[0];
   if (parseError) {
     const errorLine = parseError.type === "FieldMismatch" && parseError.row !== undefined ? lines[parseError.row] : undefined;
-    throw new Error(`${label}${errorLine === undefined ? "" : `, linha ${errorLine}`}: ${parseError.message}`);
+    let message: string;
+    if (parseError.type === "FieldMismatch") {
+      message = "Número de colunas incorreto. Confira os separadores.";
+    } else if (parseError.type === "Quotes") {
+      message = parseError.code === "MissingQuotes" ? "Aspas não fechadas. Confira o CSV." : "Aspas inválidas. Confira o CSV.";
+    } else if (parseError.type === "Delimiter") {
+      message = "Não foi possível identificar o separador do CSV.";
+    } else {
+      message = `Não foi possível ler o CSV (${parseError.code}).`;
+    }
+    throw new Error(`${label}${errorLine === undefined ? "" : `, linha ${errorLine}`}: ${message}`);
   }
   const fields = parsed.meta.fields ?? [];
   const missing = columns.filter((name) => !fields.includes(name));
@@ -117,13 +127,13 @@ export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSn
   const records = [...stuck].map(([tracking, row], index): StuckRecord => {
     const rawDays = (row["Dias parados"] ?? "").trim();
     if (!/^\d+$/.test(rawDays) || !Number.isSafeInteger(Number(rawDays))) {
-      throw new Error(`Arquivo STUCK: Dias parados inválido na linha ${stuckFile.lines[index]}.`);
+      throw new Error(`Arquivo STUCK: Dias parados inválido na linha ${stuckFile.lines[index]}. Use um número inteiro maior ou igual a zero.`);
     }
     const value = (row.Valor ?? "").trim();
     try {
       parseValueCents(value);
     } catch (caught) {
-      throw new Error(`Arquivo STUCK: Valor inválido na linha ${stuckFile.lines[index]}.`, { cause: caught });
+      throw new Error(`Arquivo STUCK: Valor inválido na linha ${stuckFile.lines[index]}. Use ponto decimal e até 2 casas.`, { cause: caught });
     }
     const update = updates.get(tracking);
     const status = (update?.Status ?? "").trim();

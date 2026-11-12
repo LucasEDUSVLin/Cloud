@@ -14,6 +14,7 @@
   --input-border: #b9c6d1;
   --button-text: #ffffff;
   --danger-text: #a42525;
+  --danger-bg: #fff1f0;
   --success-bg: #edf9f2;
   --success-text: #1d6845;
   --risk-below-bg: #e8edf1;
@@ -40,6 +41,7 @@
   --input-border: #67798b;
   --button-text: #14103a;
   --danger-text: #ffaaaa;
+  --danger-bg: #482329;
   --success-bg: #163d30;
   --success-text: #a8e7c7;
   --risk-below-bg: #36434d;
@@ -114,6 +116,10 @@ h1, h2 { font-family: Arial, Helvetica, sans-serif; }
 .file-field input { width: 100%; padding: 8px; border: 1px solid var(--input-border); border-radius: 9px; background: var(--surface); color: var(--ink); font-size: 12px; }
 .saved-file { color: var(--muted); font-weight: 400; overflow-wrap: anywhere; }
 .message { margin: 16px 0 0; }
+.feedback { position: sticky; top: 8px; z-index: 30; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; max-height: 35vh; overflow-y: auto; margin: 0 0 16px; padding: 12px 14px; border: 1px solid currentColor; border-radius: 9px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.feedback-error { background: var(--danger-bg); color: var(--danger-text); }
+.feedback-success { background: var(--success-bg); color: var(--success-text); }
+.feedback button { flex: none; padding: 0 4px; border: 0; background: transparent; color: inherit; font-size: 20px; line-height: 1; }
 .summary-notes { padding: 14px 16px; margin-top: 16px; border-radius: 9px; background: var(--note-bg); color: var(--note-text); font-size: 13px; line-height: 1.5; }
 .summary-notes p { margin: 4px 0; }
 .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
@@ -129,7 +135,7 @@ td input[type="checkbox"] { accent-color: var(--accent); }
 .risk-pill.below { background: var(--risk-below-bg); color: var(--risk-below-text); }
 .risk-pill.warning { background: var(--risk-warning-bg); color: var(--risk-warning-text); }
 .risk-pill.danger { background: var(--risk-danger-bg); color: var(--risk-danger-text); }
-.privacy-note, .success {
+.privacy-note {
   margin: 0 0 18px;
   padding: 12px 14px;
   border: 1px solid var(--line);
@@ -139,9 +145,7 @@ td input[type="checkbox"] { accent-color: var(--accent); }
   font-size: 13px;
   line-height: 1.5;
 }
-.error, .success { font-size: 13px; }
-.error { margin: 0 0 16px; color: var(--danger-text); overflow-wrap: anywhere; }
-.success { margin: 0 0 16px; border-color: var(--line); background: var(--success-bg); color: var(--success-text); }
+.error { margin: 0 0 16px; color: var(--danger-text); font-size: 13px; overflow-wrap: anywhere; }
 .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .metric-card, .panel {
   border: 1px solid var(--line);

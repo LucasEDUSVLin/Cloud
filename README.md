@@ -21,6 +21,8 @@ O nome do arquivo segue o formato `Stuck-DD-MM-AAAA-HH-MM.csv`, com a data e o h
 
 Os dois CSVs devem ter cabeçalhos, de 1 a 10.000 registros, até 10 MB cada, sem IDs vazios ou duplicados. O processamento verifica ambos antes de mesclar os dados. Pedidos sem correspondência no novo arquivo ficam sem status atualizado, mesmo que tenham aparecido anteriormente. Pedidos adicionais no arquivo de status são contados, mas não entram na lista.
 
+Se um arquivo tiver erro, o aviso informa o problema e, quando possível, a linha a corrigir. A análise anterior permanece salva.
+
 O painel exibe, pesquisa e agrupa pelo `Status` do CSV de status atualizado, sem substituí-lo pelo status do relatório STUCK. Pedidos sem correspondência ou sem status nesse CSV mostram "Sem status atualizado".
 
 O tratamento é escolhido manualmente na tabela **Mercadorias** e pode ser alterado ou voltado para **Sem classificação**. A escolha não altera o status da Shopee e é salva por TN neste navegador. As contagens abrangem o relatório do dia e não indicam conclusão do tratamento. Os filtros de dias incluem todo o relatório, independentemente do tratamento ou do status atualizado. Selecionar para exportação é independente da classificação; o CSV exportado contém os dados do arquivo de status atualizado, não a classificação manual.

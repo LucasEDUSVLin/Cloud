@@ -26,6 +26,14 @@ function formatTime(date: string) {
   return Number.isNaN(parsed.getTime()) ? "Data indisponível" : parsed.toLocaleString("pt-BR");
 }
 
+async function readCsv(file: File) {
+  try {
+    return await file.text();
+  } catch (caught) {
+    throw new Error(`Não foi possível ler ${file.name}. Selecione o arquivo novamente.`, { cause: caught });
+  }
+}
+
 function readableTextColor(hex: string) {
   const [red, green, blue] = hex.slice(1).match(/.{2}/g)!.map((channel) => parseInt(channel, 16));
   const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
@@ -68,7 +76,7 @@ export default function Home() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (saved === "dark" || saved === "light") setTheme(saved);
     } catch {
-      setThemeError("Não foi possível carregar a preferência de tema neste navegador.");
+      setThemeError("Não foi possível carregar o tema salvo.");
     }
   }, []);
 
@@ -79,7 +87,7 @@ export default function Home() {
       localStorage.setItem("stuck-theme", next);
       setThemeError("");
     } catch {
-      setThemeError("Não foi possível salvar a preferência de tema neste navegador.");
+      setThemeError("Não foi possível salvar o tema. Tente novamente.");
     }
   }
 
@@ -146,13 +154,17 @@ export default function Home() {
     setError("");
     setNotice("");
     try {
-      const contents = stuckFile ? await stuckFile.text() : snapshot?.files?.stuck.contents;
+      const contents = stuckFile ? await readCsv(stuckFile) : snapshot?.files?.stuck.contents;
       if (contents === undefined) throw new Error("Selecione o relatório STUCK.");
       const codes = extractTrackingNumbers(contents);
-      await navigator.clipboard.writeText(codes.join("\n"));
-      setNotice(`${codes.length} código(s) TN copiados.`);
+      try {
+        await navigator.clipboard.writeText(codes.join("\n"));
+      } catch (caught) {
+        throw new Error("Não foi possível copiar os BRs. Verifique a permissão de cópia do navegador.", { cause: caught });
+      }
+      setNotice(`${codes.length.toLocaleString("pt-BR")} BR${codes.length === 1 ? "" : "s"} copiado${codes.length === 1 ? "" : "s"}.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Não foi possível copiar os códigos TN.");
+      setError(caught instanceof Error ? caught.message : "Não foi possível copiar os BRs.");
     }
   }
 
@@ -164,14 +176,20 @@ export default function Home() {
       setError("Selecione os dois arquivos CSV.");
       return;
     }
-    if ([stuckFile, statusFile].some((file) => file && (!file.name.toLowerCase().endsWith(".csv") || file.size > 10 * 1024 * 1024))) {
-      setError("Selecione dois arquivos CSV de até 10 MB cada.");
+    const invalidExtension = [stuckFile, statusFile].find((file) => file && !file.name.toLowerCase().endsWith(".csv"));
+    if (invalidExtension) {
+      setError(`${invalidExtension.name}: selecione um arquivo CSV.`);
+      return;
+    }
+    const tooLarge = [stuckFile, statusFile].find((file) => file && file.size > 10 * 1024 * 1024);
+    if (tooLarge) {
+      setError(`${tooLarge.name}: o limite é 10 MB por arquivo.`);
       return;
     }
     setBusy(true);
     try {
-      const stuck = stuckFile ? { name: stuckFile.name, contents: await stuckFile.text() } : snapshot?.files?.stuck;
-      const updated = statusFile ? { name: statusFile.name, contents: await statusFile.text() } : snapshot?.files?.updated;
+      const stuck = stuckFile ? { name: stuckFile.name, contents: await readCsv(stuckFile) } : snapshot?.files?.stuck;
+      const updated = statusFile ? { name: statusFile.name, contents: await readCsv(statusFile) } : snapshot?.files?.updated;
       if (!stuck || !updated) throw new Error("Selecione os dois arquivos CSV.");
       const imported = { ...processStuckFiles(stuck.contents, updated.contents), files: { stuck, updated } };
       await saveSnapshot(imported);
@@ -184,7 +202,7 @@ export default function Home() {
       setStuckFile(null);
       setStatusFile(null);
       setImportOpen(false);
-      setNotice(`Importação concluída: ${imported.records.length.toLocaleString("pt-BR")} mercadoria(s) do dia.`);
+      setNotice(`Análise concluída: ${imported.records.length.toLocaleString("pt-BR")} mercadoria${imported.records.length === 1 ? "" : "s"}.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível importar os arquivos.");
     } finally {
@@ -208,6 +226,7 @@ export default function Home() {
 
   async function handleTreatment(record: StuckRecord, value: string) {
     setError("");
+    setNotice("");
     if (value !== "" && !isTreatment(value)) {
       setError("Classificação de tratamento inválida.");
       return;
@@ -234,6 +253,7 @@ export default function Home() {
 
   async function handleTrackingColor(tracking: string, color: string | null) {
     setError("");
+    setNotice("");
     try {
       await setTrackingColor(tracking, color);
       setTrackingColors((previous) => {
@@ -261,8 +281,15 @@ export default function Home() {
   function handleExport() {
     if (!snapshot) return;
     setError("");
+    setNotice("");
+    let csv: string;
     try {
-      const csv = exportSelectedCsv(snapshot, selected);
+      csv = exportSelectedCsv(snapshot, selected);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível exportar as mercadorias.");
+      return;
+    }
+    try {
       const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
       const link = document.createElement("a");
       link.href = url;
@@ -271,8 +298,8 @@ export default function Home() {
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Não foi possível exportar as mercadorias.");
+    } catch {
+      setError("Não foi possível baixar o CSV. Tente novamente.");
     }
   }
 
@@ -294,11 +321,11 @@ export default function Home() {
             <button type="button" className="secondary-button" aria-expanded={importOpen} disabled={busy || savingTreatment}
               aria-controls="import-reports"
               onClick={() => {
+                setError("");
+                setNotice("");
                 if (importOpen) {
                   setStuckFile(null);
                   setStatusFile(null);
-                  setError("");
-                  setNotice("");
                 }
                 setImportOpen(!importOpen);
               }}>
@@ -309,9 +336,12 @@ export default function Home() {
       </header>
       <section className="content">
         <div className="privacy-note">
-          Os relatórios e as marcações de tratamento ficam somente neste navegador. Não são compartilhados e podem ser apagados ao limpar os dados do site. Proteja os arquivos CSV baixados, que podem conter dados pessoais.
+          Arquivos e marcações ficam neste navegador e podem ser apagados ao limpar os dados do site. Proteja os CSVs baixados: podem conter dados pessoais.
         </div>
         {themeError && <p className="error message" role="alert">{themeError}</p>}
+        {error && <div className="feedback feedback-error" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")} aria-label="Fechar mensagem de erro">×</button></div>}
+        {amounts.error && <p className="error message" role="alert">{amounts.error} Importe relatórios com valores válidos.</p>}
+        {notice && <div className="feedback feedback-success" role="status"><span>{notice}</span><button type="button" onClick={() => setNotice("")} aria-label="Fechar mensagem">×</button></div>}
 
         {!loading && (!snapshot || importOpen) && <section id="import-reports" className="panel import-panel">
           <div>
@@ -323,14 +353,14 @@ export default function Home() {
               <label className="file-field">
                 <span>1. Relatório principal (STUCK)</span>
                 {snapshot?.files?.stuck && <span className="saved-file">Salvo: {snapshot.files.stuck.name}</span>}
-                <input type="file" accept=".csv,text/csv" onChange={(event) => setStuckFile(event.target.files?.[0] ?? null)} disabled={busy} />
+                <input type="file" accept=".csv,text/csv" onChange={(event) => { setStuckFile(event.target.files?.[0] ?? null); setError(""); setNotice(""); }} disabled={busy} />
               </label>
               <button type="button" className="secondary-button" onClick={handleCopyTn} disabled={busy || (!stuckFile && !snapshot?.files?.stuck)}>Copiar BRs</button>
             </div>
             <label className="file-field">
               <span>2. Arquivo de status atualizado</span>
               {snapshot?.files?.updated && <span className="saved-file">Salvo: {snapshot.files.updated.name}</span>}
-              <input type="file" accept=".csv,text/csv" onChange={(event) => setStatusFile(event.target.files?.[0] ?? null)} disabled={busy} />
+              <input type="file" accept=".csv,text/csv" onChange={(event) => { setStatusFile(event.target.files?.[0] ?? null); setError(""); setNotice(""); }} disabled={busy} />
             </label>
             <button type="submit" className="primary-button" disabled={busy || loading || savingTreatment || !treatmentReady || (!stuckFile && !snapshot?.files?.stuck) || (!statusFile && !snapshot?.files?.updated) || (!stuckFile && !statusFile)}>
               {busy ? "Processando..." : "Analisar arquivos"}
@@ -338,9 +368,6 @@ export default function Home() {
           </form>
         </section>}
 
-        {error && <p className="error message" role="alert">{error}</p>}
-        {amounts.error && <p className="error message" role="alert">{amounts.error} Importe relatórios com valores válidos.</p>}
-        {notice && <p className="success message" role="status">{notice}</p>}
         {loading ? <p className="empty-state" role="status">Carregando dados salvos...</p> : snapshot ? (
           <>
             <div className="section-title">
@@ -355,9 +382,9 @@ export default function Home() {
               <Metric label="Débito por status LOST" value={amounts.values ? formatCurrency(amounts.values.lostCents) : "Indisponível"} />
             </div>
             <div className="summary-notes">
-              <p><strong>{counts.limit}</strong> mercadoria(s) com exatamente 15 dias segundo o relatório STUCK. <strong>{counts.unmatched}</strong> sem status atualizado conhecido.</p>
-              {snapshot.unmatchedUpdates > 0 && <p>{snapshot.unmatchedUpdates} pedido(s) do arquivo de status não constam no relatório STUCK e foram ignorados.</p>}
-              <p>O tratamento é classificado manualmente e não depende do status da Shopee. Cada importação substitui a lista anterior.</p>
+              <p><strong>{counts.limit}</strong> com 15 dias. <strong>{counts.unmatched}</strong> sem status atualizado.</p>
+              {snapshot.unmatchedUpdates > 0 && <p>{snapshot.unmatchedUpdates} pedido(s) extras no arquivo de status foram ignorados.</p>}
+              <p>O tratamento é manual. Uma nova importação substitui a lista.</p>
             </div>
 
             <section className="panel charts-panel">
@@ -428,7 +455,7 @@ export default function Home() {
                 <button type="button" className="primary-button" disabled={!selected.size || !snapshot.exportFields} onClick={handleExport}>Exportar selecionadas (CSV)</button>
               </div>
               {!snapshot.exportFields && <p className="export-note">Para exportar, clique em Atualizar relatórios e importe novamente os dois arquivos.</p>}
-              {snapshot.exportFields && <p className="export-note">O CSV inclui apenas as colunas do arquivo de status atualizado. Mercadorias sem correspondência impedem a exportação. Valores que possam ser interpretados como fórmulas recebem um apóstrofo por segurança.</p>}
+              {snapshot.exportFields && <p className="export-note">O CSV usa os dados do arquivo de status. BRs sem correspondência impedem a exportação. Possíveis fórmulas recebem um apóstrofo.</p>}
               {visible.length === 0 ? <p className="empty-state">Nenhuma mercadoria encontrada neste filtro.</p> : (
                 <>
                   <div className="table-scroll">
