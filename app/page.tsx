@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers, valueTotals, exportSelectedCsv, exportFilename } from "@/lib/stuck";
-import { readSnapshot, readTreatments, saveSnapshot, setTrackingTreatment } from "@/lib/stuck-storage";
+import { mergeStuckSnapshots, processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers, valueTotals, exportSelectedCsv, exportFilename } from "@/lib/stuck";
+import { readSnapshot, readTreatments, removeSnapshotRecord, saveSnapshot, setTrackingTreatment } from "@/lib/stuck-storage";
 import { isTreatment, TREATMENT_OPTIONS, type Treatment } from "@/lib/treatment";
 import { chartCounts } from "@/lib/visualization";
 
-type Filter = "unclassified" | "classified" | "overdue" | "unmatched" | "all";
+type Filter = "new" | "unclassified" | "classified" | "overdue" | "unmatched" | "all";
 const PAGE_SIZE = 50;
 const currencyFormat = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -24,6 +24,7 @@ function formatTime(date: string) {
 }
 
 function filterRecord(record: StuckRecord, filter: Filter, treatments: ReadonlyMap<string, Treatment>) {
+  if (filter === "new") return Boolean(record.isNew) && !treatments.has(record.tracking);
   if (filter === "unclassified") return !treatments.has(record.tracking);
   if (filter === "classified") return treatments.has(record.tracking);
   if (filter === "overdue") return record.days > 15;
@@ -90,6 +91,8 @@ export default function Home() {
     const records = snapshot?.records ?? [];
     return {
       total: records.length,
+      new: records.filter((row) => row.isNew && !treatments.has(row.tracking)).length,
+      absentFromLatest: records.filter((row) => row.lastSeenAt && row.lastSeenAt !== snapshot?.importedAt).length,
       unclassified: records.filter((row) => !treatments.has(row.tracking)).length,
       classified: records.filter((row) => treatments.has(row.tracking)).length,
       overdue: records.filter((row) => row.days > 15).length,
@@ -160,7 +163,10 @@ export default function Home() {
       const stuck = stuckFile ? { name: stuckFile.name, contents: await stuckFile.text() } : snapshot?.files?.stuck;
       const updated = statusFile ? { name: statusFile.name, contents: await statusFile.text() } : snapshot?.files?.updated;
       if (!stuck || !updated) throw new Error("Selecione os dois arquivos CSV.");
-      const result = { ...processStuckFiles(stuck.contents, updated.contents), files: { stuck, updated } };
+      const imported = { ...processStuckFiles(stuck.contents, updated.contents), files: { stuck, updated } };
+      const previous = await readSnapshot();
+      const previousTrackings = new Set(previous?.records.map((record) => record.tracking) ?? []);
+      const result = mergeStuckSnapshots(previous, imported);
       await saveSnapshot(result);
       setSnapshot(result);
       setFilter("all");
@@ -171,7 +177,9 @@ export default function Home() {
       setStuckFile(null);
       setStatusFile(null);
       setImportOpen(false);
-      setNotice(`${result.records.length.toLocaleString("pt-BR")} mercadorias carregadas. O painel agora mostra somente o novo arquivo STUCK.`);
+      const newCount = imported.records.filter((record) => !previousTrackings.has(record.tracking)).length;
+      const retainedCount = result.records.filter((record) => record.lastSeenAt !== result.importedAt).length;
+      setNotice(`Importação concluída: ${newCount.toLocaleString("pt-BR")} nova(s), ${retainedCount.toLocaleString("pt-BR")} mercadoria(s) fora do arquivo de hoje mantida(s) e ${result.records.length.toLocaleString("pt-BR")} no histórico.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível importar os arquivos.");
     } finally {
@@ -193,6 +201,29 @@ export default function Home() {
     setSelected(new Set());
   }
 
+  async function handleRemoveRecord(record: StuckRecord) {
+    if (!snapshot || !window.confirm(`Remover ${record.tracking} do histórico salvo? Esta ação também apaga a classificação de tratamento.`)) return;
+    setError("");
+    setNotice("");
+    try {
+      await removeSnapshotRecord(snapshot, record.tracking);
+      setSnapshot({ ...snapshot, records: snapshot.records.filter((item) => item.tracking !== record.tracking) });
+      setSelected((previous) => {
+        const next = new Set(previous);
+        next.delete(record.tracking);
+        return next;
+      });
+      setTreatments((previous) => {
+        const next = new Map(previous);
+        next.delete(record.tracking);
+        return next;
+      });
+      setNotice(`${record.tracking} foi removido do histórico salvo.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível remover a mercadoria.");
+    }
+  }
+
   async function handleTreatment(record: StuckRecord, value: string) {
     setError("");
     if (value !== "" && !isTreatment(value)) {
@@ -209,7 +240,7 @@ export default function Home() {
         else next.delete(record.tracking);
         return next;
       });
-      if (((filter === "unclassified" && treatment !== null) || (filter === "classified" && treatment === null)) && visible.length === 1 && page > 0) {
+      if (((filter === "new" && treatment !== null) || (filter === "unclassified" && treatment !== null) || (filter === "classified" && treatment === null)) && visible.length === 1 && page > 0) {
         setPage((previous) => previous - 1);
       }
     } catch (caught) {
@@ -318,22 +349,24 @@ export default function Home() {
               <div><h2>Visão geral</h2><p className="muted">Última importação neste navegador: {formatTime(snapshot.importedAt)}</p></div>
             </div>
             <div className="metric-grid">
-              <Metric label="No relatório STUCK" value={counts.total} />
+              <Metric label="No histórico salvo" value={counts.total} />
+              <Metric label="Novas sem classificação" value={counts.new} />
               <Metric label="Sem classificação" value={counts.unclassified} />
               <Metric label="Classificadas" value={counts.classified} />
               <Metric label="Acima de 15 dias" value={counts.overdue} />
-              <Metric label="Valor total no relatório STUCK" value={formatCurrency(amounts.totalCents)} />
+              <Metric label="Valor total no histórico" value={formatCurrency(amounts.totalCents)} />
               <Metric label="Débito por status LOST" value={formatCurrency(amounts.lostCents)} />
             </div>
             <div className="summary-notes">
-              <p><strong>{counts.limit}</strong> mercadoria(s) com exatamente 15 dias. <strong>{counts.unmatched}</strong> sem status atualizado correspondente.</p>
+              <p><strong>{counts.limit}</strong> mercadoria(s) com exatamente 15 dias segundo o último STUCK em que apareceram. <strong>{counts.unmatched}</strong> sem status atualizado conhecido.</p>
+              <p><strong>{counts.absentFromLatest}</strong> mercadoria(s) mantida(s) no histórico, mas ausente(s) do último relatório STUCK. Os dados delas são os últimos importados.</p>
               {snapshot.unmatchedUpdates > 0 && <p>{snapshot.unmatchedUpdates} pedido(s) do arquivo de status não constam no relatório STUCK e foram ignorados.</p>}
-              <p>O tratamento é classificado manualmente e não depende do status da Shopee. Os dias são os do arquivo STUCK e não aumentam automaticamente.</p>
+              <p>O tratamento é classificado manualmente e não depende do status da Shopee. Para registros antigos, os dias, valores e status são os últimos dados importados; não aumentam automaticamente.</p>
             </div>
 
             <section className="panel charts-panel">
               <div className="records-heading">
-                <div><h2>Visualização dos STUCKs</h2><p className="muted">Distribuição de todas as mercadorias do relatório atual, independentemente dos filtros.</p></div>
+                <div><h2>Visualização dos STUCKs</h2><p className="muted">Distribuição de todo o histórico salvo, independentemente dos filtros.</p></div>
               </div>
               <div className="charts-grid">
                 <div>
@@ -374,7 +407,7 @@ export default function Home() {
 
             <section className="panel">
               <div className="records-heading">
-                <div><h2>Status atualizados</h2><p className="muted">Distribuição dos pedidos do relatório STUCK. Selecione um status para filtrar.</p></div>
+                <div><h2>Status atualizados</h2><p className="muted">Último status conhecido no histórico. Selecione um status para filtrar.</p></div>
                 {statusFilter !== null && <button className="text-button" onClick={() => { setStatusFilter(null); setPage(0); setSelected(new Set()); }}>Limpar status</button>}
               </div>
               <div className="status-grid">
@@ -399,6 +432,7 @@ export default function Home() {
               </div>
               <div className="filter-bar" aria-label="Filtros de mercadorias">
                 {([
+                  ["new", `Novas (${counts.new})`],
                   ["unclassified", `Sem classificação (${counts.unclassified})`],
                   ["classified", `Classificadas (${counts.classified})`],
                   ["overdue", `Acima de 15 dias (${counts.overdue})`],
@@ -423,7 +457,7 @@ export default function Home() {
                 <>
                   <div className="table-scroll">
                     <table>
-                      <thead><tr><th><span className="sr-only">Selecionar para exportação</span></th><th>Rastreamento</th><th>Tratamento</th><th>Dias parados</th><th>Comparação com 15 dias</th><th>Status atualizado</th><th>Entregador</th><th>Cidade</th><th>Estação atual</th><th>Avaria</th><th>Valor</th></tr></thead>
+                      <thead><tr><th><span className="sr-only">Selecionar para exportação</span></th><th>Rastreamento</th><th>Tratamento</th><th>Dias parados</th><th>Comparação com 15 dias</th><th>Status atualizado</th><th>Última aparição</th><th>Entregador</th><th>Cidade</th><th>Estação atual</th><th>Avaria</th><th>Valor</th><th>Ação</th></tr></thead>
                       <tbody>{visible.map((row) => (
                         <tr key={row.tracking}>
                           <td><input type="checkbox" aria-label={`Selecionar ${row.tracking}`} checked={selected.has(row.tracking)} disabled={!snapshot.exportFields}
@@ -436,7 +470,7 @@ export default function Home() {
                                 return next;
                               });
                             }} /></td>
-                          <td className="order-id">{row.tracking}</td>
+                          <td className="order-id">{row.tracking}{row.isNew && !treatments.has(row.tracking) && <span className="new-badge">NOVA</span>}</td>
                           <td><select className="treatment-control" aria-label={`Tratamento ${row.tracking}`}
                             value={treatments.get(row.tracking) ?? ""} disabled={savingTreatment || busy}
                             onChange={(event) => handleTreatment(row, event.target.value)}>
@@ -445,12 +479,14 @@ export default function Home() {
                           </select></td>
                           <td><strong>{row.days}</strong></td>
                           <td><span className={`risk-pill ${row.days > 15 ? "danger" : row.days === 15 ? "warning" : "below"}`}>{risk(row)}</span></td>
-                          <td><span className="status-pill" title={row.updatedStatus ?? ""}>{statusLabel(row.updatedStatus)}</span></td>
+                          <td><span className="status-pill" title={row.updatedStatus ?? ""}>{statusLabel(row.updatedStatus)}</span>{row.lastUpdatedAt && <small className="cell-note">Lido em {formatTime(row.lastUpdatedAt)}</small>}</td>
+                          <td>{row.lastSeenAt ? formatTime(row.lastSeenAt) : "Data desconhecida"}</td>
                           <td>{row.updatedDriver || "—"}</td>
                           <td>{row.city || "—"}</td>
                           <td>{row.station || "—"}</td>
                           <td>{row.damage || "—"}</td>
                           <td>{row.value || "—"}</td>
+                          <td><button type="button" className="text-button remove-button" disabled={busy || savingTreatment} onClick={() => handleRemoveRecord(row)}>Remover</button></td>
                         </tr>
                       ))}</tbody>
                     </table>

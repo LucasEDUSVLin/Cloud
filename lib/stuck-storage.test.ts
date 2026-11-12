@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { processStuckFiles } from "./stuck";
-import { readSnapshot, readTreatments, saveSnapshot, setTrackingTreatment } from "./stuck-storage";
+import { readSnapshot, readTreatments, removeSnapshotRecord, saveSnapshot, setTrackingTreatment } from "./stuck-storage";
 import { TREATMENT_OPTIONS } from "./treatment";
 
 const status = "Order ID,Status,Driver Name,Driver Phone,Current Station,Current Station Received Time,Delivered Time\nA,Delivered,,,Station,,";
@@ -55,6 +55,15 @@ describe("banco local de STUCK", () => {
       await setTrackingTreatment("A", option);
       expect((await readTreatments()).get("A")).toBe(option);
     }
+  });
+
+  it("remove atomicamente uma mercadoria e sua classificação", async () => {
+    const snapshot = processStuckFiles(stuck, status);
+    await saveSnapshot(snapshot);
+    await setTrackingTreatment("A", "Em análise");
+    await removeSnapshotRecord(snapshot, "A");
+    expect((await readSnapshot())?.records).toEqual([]);
+    expect(await readTreatments()).toEqual(new Map());
   });
 
   it("remove somente as antigas marcações, sem apagar o relatório ou classificações novas", async () => {

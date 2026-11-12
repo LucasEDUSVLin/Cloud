@@ -18,6 +18,9 @@ export type StuckRecord = {
   station: string;
   receivedTime: string;
   deliveredTime: string;
+  isNew?: boolean;
+  lastSeenAt?: string;
+  lastUpdatedAt?: string;
   source?: {
     stuck: Record<string, string>;
     updated: Record<string, string> | null;
@@ -78,6 +81,7 @@ export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSn
   const updatedFile = parseFile(updatedCsv, UPDATED_COLUMNS, "Arquivo de status");
   const stuck = uniqueMap(stuckFile.rows, "TN", "Arquivo STUCK");
   const updates = uniqueMap(updatedFile.rows, "Order ID", "Arquivo de status");
+  const importedAt = new Date().toISOString();
   const records = [...stuck].map(([tracking, row], index): StuckRecord => {
     const rawDays = (row["Dias parados"] ?? "").trim();
     if (!/^\d+$/.test(rawDays) || !Number.isSafeInteger(Number(rawDays))) {
@@ -106,15 +110,52 @@ export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSn
       station: (update?.["Current Station"] ?? "").trim(),
       receivedTime: (update?.["Current Station Received Time"] ?? "").trim(),
       deliveredTime: (update?.["Delivered Time"] ?? "").trim(),
+      isNew: true,
+      lastSeenAt: importedAt,
+      lastUpdatedAt: update ? importedAt : undefined,
       source: { stuck: row, updated: update ?? null },
     };
   });
   return {
     records,
     unmatchedUpdates: [...updates.keys()].filter((id) => !stuck.has(id)).length,
-    importedAt: new Date().toISOString(),
+    importedAt,
     exportFields: { stuck: stuckFile.fields, updated: updatedFile.fields, updatedOriginal: updatedFile.originalFields },
   };
+}
+
+export function mergeStuckSnapshots(previous: StuckSnapshot | null, current: StuckSnapshot): StuckSnapshot {
+  if (!previous) return current;
+
+  const previousRecords = new Map(previous.records.map((record) => [record.tracking, record]));
+  const records: StuckRecord[] = current.records.map((record) => {
+    const saved = previousRecords.get(record.tracking);
+    if (!saved) return { ...record, isNew: true, lastSeenAt: current.importedAt };
+
+    previousRecords.delete(record.tracking);
+    const currentUpdate = record.source?.updated;
+    const savedUpdate = saved.source?.updated;
+    const preserveSavedUpdate = !currentUpdate && savedUpdate;
+    return {
+      ...record,
+      updatedStatus: preserveSavedUpdate ? saved.updatedStatus : record.updatedStatus,
+      updatedDriver: preserveSavedUpdate ? saved.updatedDriver : record.updatedDriver,
+      driverPhone: preserveSavedUpdate ? saved.driverPhone : record.driverPhone,
+      station: preserveSavedUpdate ? saved.station : record.station,
+      receivedTime: preserveSavedUpdate ? saved.receivedTime : record.receivedTime,
+      deliveredTime: preserveSavedUpdate ? saved.deliveredTime : record.deliveredTime,
+      isNew: saved.isNew ?? false,
+      lastSeenAt: current.importedAt,
+      lastUpdatedAt: currentUpdate ? current.importedAt : saved.lastUpdatedAt,
+      source: {
+        stuck: record.source?.stuck ?? saved.source?.stuck ?? {},
+        updated: currentUpdate ?? savedUpdate ?? null,
+      },
+    };
+  });
+
+  for (const saved of previousRecords.values()) records.push(saved);
+  return { ...current, records };
 }
 
 export function extractTrackingNumbers(stuckCsv: string) {
