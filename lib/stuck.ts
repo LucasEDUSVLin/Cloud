@@ -209,7 +209,6 @@ export function parseValueCents(value: string) {
 export function valueTotals(records: readonly StuckRecord[]) {
   const byStatus = new Map<string, number>();
   let totalCents = 0;
-  let lostCents = 0;
 
   for (const record of records) {
     const cents = parseValueCents(record.value);
@@ -219,14 +218,9 @@ export function valueTotals(records: readonly StuckRecord[]) {
       throw new Error("A soma dos valores excede o limite numérico permitido.");
     }
     byStatus.set(status, (byStatus.get(status) ?? 0) + cents);
-    if (status.trim().toLocaleUpperCase("pt-BR") === "LOST") lostCents += cents;
   }
 
-  return { totalCents, lostCents, byStatus };
-}
-
-export function delivered(record: StuckRecord) {
-  return record.updatedStatus?.toLowerCase() === "delivered";
+  return { totalCents, byStatus };
 }
 
 export function risk(record: StuckRecord) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Papa from "papaparse";
-import { delivered, exportFilename, exportSelectedCsv, extractTrackingNumbers, formatCurrency, parseValueCents, processStuckFiles, risk, valueTotals } from "./stuck";
+import { exportFilename, exportSelectedCsv, extractTrackingNumbers, formatCurrency, parseValueCents, processStuckFiles, risk, valueTotals } from "./stuck";
 
 const stuckHeader = "Operação,Cidade,Entegador,TN,Status,Dias parados,Valor,Palavra Chave,Avaria";
 const statusHeader = "Order ID,Status,Driver Name,Driver Phone,Current Station,Current Station Received Time,Delivered Time";
@@ -13,14 +13,12 @@ describe("relatórios STUCK", () => {
     expect(exportFilename(new Date(2026, 0, 2, 3, 4))).toBe("Stuck-02-01-2026-03-04.csv");
   });
 
-  it("cruza por TN e Order ID, conserva apenas a lista STUCK e distingue entregues", () => {
+  it("cruza por TN e Order ID e conserva apenas a lista STUCK", () => {
     const snapshot = processStuckFiles(
       [stuckHeader, stuckRow("A", "15"), stuckRow("B", "16"), stuckRow("C", "3")].join("\n"),
       [statusHeader, statusRow("A", "Delivered"), statusRow("B", "OnHold"), statusRow("D", "Delivered")].join("\n"),
     );
     expect(snapshot.records).toHaveLength(3);
-    expect(delivered(snapshot.records[0])).toBe(true);
-    expect(delivered(snapshot.records[1])).toBe(false);
     expect(snapshot.records[0].updatedStatus).toBe("Delivered");
     expect(snapshot.records[0].stuckStatus).toBe("Hub_Received");
     expect(snapshot.records[2].updatedStatus).toBeNull();
@@ -68,14 +66,13 @@ describe("relatórios STUCK", () => {
     expect(extractTrackingNumbers([stuckHeader, stuckRow("A", "1"), stuckRow("B", "2")].join("\n"))).toEqual(["A", "B"]);
   });
 
-  it("soma os valores por status atualizado e considera LOST somente quando explícito", () => {
+  it("soma os valores por status atualizado", () => {
     const snapshot = processStuckFiles(
       [stuckHeader, stuckRow("A", "1"), stuckRow("B", "2"), stuckRow("C", "3")].join("\n"),
       [statusHeader, statusRow("A", "LOST"), statusRow("B", "lost"), statusRow("C", "OnHold")].join("\n"),
     );
     const totals = valueTotals(snapshot.records);
     expect(totals.totalCents).toBe(6723);
-    expect(totals.lostCents).toBe(4482);
     expect(totals.byStatus.get("LOST")).toBe(2241);
     expect(totals.byStatus.get("lost")).toBe(2241);
     expect(totals.byStatus.get("OnHold")).toBe(2241);

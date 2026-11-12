@@ -1,14 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers, valueTotals, exportSelectedCsv, exportFilename, formatCurrency } from "@/lib/stuck";
 import { readSnapshot, readTrackingColors, readTreatments, saveSnapshot, setTrackingColor, setTrackingTreatment } from "@/lib/stuck-storage";
 import { isTreatment, TREATMENT_OPTIONS, type Treatment } from "@/lib/treatment";
-import { chartCounts } from "@/lib/visualization";
+import { chartCounts, matchesChartFilter, type ChartFilter, type DayCounts } from "@/lib/visualization";
 
 type Filter = "unclassified" | "classified" | "overdue" | "unmatched" | "all";
 const PAGE_SIZE = 50;
 const CHART_COLORS = ["#6c63ff", "#ff6b6b", "#f7b731", "#20bf6b", "#45aaf2", "#a55eea", "#fd79a8", "#26de81", "#2bcbba", "#fa8231"];
+const DAY_LABELS: Record<keyof DayCounts, string> = {
+  below: "Abaixo de 15 dias",
+  atLimit: "Exatamente 15 dias",
+  above: "Acima de 15 dias",
+};
 const MARK_COLORS = [
   ["#f4cccc", "#fce5cd", "#fff2cc", "#d9ead3", "#d0e0e3", "#c9daf8", "#cfe2f3", "#d9d2e9", "#ead1dc", "#e6b8af"],
   ["#ea9999", "#f9cb9c", "#ffe599", "#b6d7a8", "#a2c4c9", "#a4c2f4", "#9fc5e8", "#b4a7d6", "#d5a6bd", "#dd7e6b"],
@@ -59,6 +64,7 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [chartFilter, setChartFilter] = useState<ChartFilter | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -68,6 +74,7 @@ export default function Home() {
   const [savingTreatment, setSavingTreatment] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [themeError, setThemeError] = useState("");
+  const recordsRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     try {
@@ -130,12 +137,13 @@ export default function Home() {
     const query = search.trim().toLocaleLowerCase("pt-BR");
     return (snapshot?.records ?? [])
       .filter((record) => filterRecord(record, filter, treatments) &&
+      (chartFilter === null || matchesChartFilter(record, treatments.get(record.tracking), chartFilter)) &&
       (statusFilter === null || (record.updatedStatus ?? "") === statusFilter) && (!query || [
         record.tracking, record.city, record.operation, record.updatedDriver,
         record.updatedStatus ?? "", record.station,
       ].some((value) => value.toLocaleLowerCase("pt-BR").includes(query))))
       .sort((a, b) => b.days - a.days || a.tracking.localeCompare(b.tracking));
-  }, [snapshot, filter, search, statusFilter, treatments]);
+  }, [snapshot, filter, search, statusFilter, chartFilter, treatments]);
   const statuses = useMemo(() => {
     const groups = new Map<string, number>();
     for (const record of snapshot?.records ?? []) {
@@ -196,6 +204,7 @@ export default function Home() {
       setSnapshot(imported);
       setFilter("all");
       setStatusFilter(null);
+      setChartFilter(null);
       setSearch("");
       setPage(0);
       setSelected(new Set());
@@ -213,6 +222,7 @@ export default function Home() {
   function selectFilter(value: Filter) {
     setFilter(value);
     setStatusFilter(null);
+    setChartFilter(null);
     setPage(0);
     setSelected(new Set());
   }
@@ -220,8 +230,19 @@ export default function Home() {
   function selectStatus(status: string) {
     setFilter("all");
     setStatusFilter(statusFilter === status ? null : status);
+    setChartFilter(null);
     setPage(0);
     setSelected(new Set());
+  }
+
+  function selectChartFilter(value: ChartFilter) {
+    setFilter("all");
+    setStatusFilter(null);
+    setChartFilter(value);
+    setSearch("");
+    setPage(0);
+    setSelected(new Set());
+    recordsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function handleTreatment(record: StuckRecord, value: string) {
@@ -241,8 +262,16 @@ export default function Home() {
         else next.delete(record.tracking);
         return next;
       });
-      if (((filter === "unclassified" && treatment !== null) || (filter === "classified" && treatment === null)) && visible.length === 1 && page > 0) {
-        setPage((previous) => previous - 1);
+      const leavesFilter = (filter === "unclassified" && treatment !== null)
+        || (filter === "classified" && treatment === null)
+        || (chartFilter !== null && !matchesChartFilter(record, treatment ?? undefined, chartFilter));
+      if (leavesFilter) {
+        setSelected((previous) => {
+          const next = new Set(previous);
+          next.delete(record.tracking);
+          return next;
+        });
+        if (visible.length === 1 && page > 0) setPage((previous) => previous - 1);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível salvar o tratamento.");
@@ -377,9 +406,7 @@ export default function Home() {
               <Metric label="Mercadorias" value={counts.total} />
               <Metric label="Sem classificação" value={counts.unclassified} />
               <Metric label="Classificadas" value={counts.classified} />
-              <Metric label="Acima de 15 dias" value={counts.overdue} />
               <Metric label="Valor total" value={amounts.values ? formatCurrency(amounts.values.totalCents) : "Indisponível"} />
-              <Metric label="Débito por LOST" value={amounts.values ? formatCurrency(amounts.values.lostCents) : "Indisponível"} />
             </div>
             <div className="summary-notes">
               <p><strong>{counts.limit.toLocaleString("pt-BR")}</strong> com exatamente 15 dias · <strong>{counts.unmatched.toLocaleString("pt-BR")}</strong> sem status atualizado</p>
@@ -389,22 +416,22 @@ export default function Home() {
 
             <section className="panel charts-panel">
               <div className="records-heading">
-                <div><h2>Visualização dos STUCKs</h2><p className="muted">Distribuição do relatório do dia, independentemente dos filtros.</p></div>
+                <div><h2>Visualização dos STUCKs</h2><p className="muted">Selecione uma informação para ver as mercadorias.</p></div>
               </div>
               <div className="charts-grid">
                 <div>
                   <h3>Dias parados</h3>
                   <p className="chart-description">Distribuição por comparação com 15 dias.</p>
-                  <DaysLine days={charts.days} total={counts.total} />
+                  <DaysLine days={charts.days} total={counts.total} selected={chartFilter} onSelect={selectChartFilter} />
                   <p className="chart-description">Os dias não determinam status LOST ou débito.</p>
                 </div>
                 <div>
-                  <h3>Classificação de tratamento</h3>
+                  <h3>Classificação</h3>
                   <p className="chart-description">Classificações manuais salvas neste navegador; não indicam conclusão.</p>
                   <TreatmentBars items={[
-                    { label: "Sem classificação", count: charts.unclassified },
-                    ...TREATMENT_OPTIONS.map((option) => ({ label: option, count: charts.classification.get(option) ?? 0 })),
-                  ]} />
+                    { value: null, label: "Sem classificação", count: charts.unclassified },
+                    ...TREATMENT_OPTIONS.map((option) => ({ value: option, label: option, count: charts.classification.get(option) ?? 0 })),
+                  ]} selected={chartFilter} onSelect={selectChartFilter} />
                 </div>
               </div>
             </section>
@@ -427,7 +454,7 @@ export default function Home() {
               </div>
             </section>
 
-            <section className="panel records-panel">
+            <section className="panel records-panel" ref={recordsRef}>
               <div className="records-heading">
                 <div><h2>Mercadorias</h2><p className="muted">{filtered.length.toLocaleString("pt-BR")} registro(s) encontrados{statusFilter !== null ? ` — ${statusLabel(statusFilter || null)}` : ""}. Ordenados por dias parados.</p></div>
                 <label className="search-field"><span className="sr-only">Buscar pedido, cidade, entregador ou status</span>
@@ -442,9 +469,13 @@ export default function Home() {
                   ["unmatched", `Sem status atualizado (${counts.unmatched})`],
                   ["all", `Todos (${counts.total})`],
                 ] as [Filter, string][]).map(([key, label]) => (
-                  <button key={key} type="button" className={filter === key ? "active" : ""} aria-pressed={filter === key} onClick={() => selectFilter(key)}>{label}</button>
+                  <button key={key} type="button" className={filter === key && chartFilter === null ? "active" : ""} aria-pressed={filter === key && chartFilter === null} onClick={() => selectFilter(key)}>{label}</button>
                 ))}
               </div>
+              {chartFilter && <div className="chart-filter-note" role="status">
+                <span>Filtro do gráfico: <strong>{chartFilter.kind === "days" ? DAY_LABELS[chartFilter.value] : chartFilter.value ?? "Sem classificação"}</strong></span>
+                <button type="button" className="text-button" onClick={() => { setChartFilter(null); setPage(0); setSelected(new Set()); }}>Limpar filtro do gráfico</button>
+              </div>}
               <div className="selection-bar">
                 <button type="button" className="secondary-button" disabled={!filtered.length || !snapshot.exportFields}
                   onClick={toggleFilteredSelection}>
@@ -535,12 +566,10 @@ function Metric({ label, value }: { label: string; value: number | string }) {
   return <article className="metric-card"><p>{label}</p><strong>{typeof value === "number" ? value.toLocaleString("pt-BR") : value}</strong></article>;
 }
 
-function DaysLine({ days, total }: { days: { below: number; atLimit: number; above: number }; total: number }) {
-  const items = [
-    { label: "Abaixo de 15 dias", count: days.below },
-    { label: "Exatamente 15 dias", count: days.atLimit },
-    { label: "Acima de 15 dias", count: days.above },
-  ];
+function DaysLine({ days, total, selected, onSelect }: { days: DayCounts; total: number; selected: ChartFilter | null; onSelect: (filter: ChartFilter) => void }) {
+  const items = (["below", "atLimit", "above"] as const).map((value) => ({
+    value, label: DAY_LABELS[value], count: days[value],
+  }));
   const max = Math.max(...items.map((item) => item.count));
   const points = items.map((item, index) => ({
     x: (index + 0.5) * 100 / items.length,
@@ -548,30 +577,40 @@ function DaysLine({ days, total }: { days: { below: number; atLimit: number; abo
   }));
   return (
     <div className="days-chart">
-      <div className="days-plot" aria-hidden="true">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+      <div className="days-plot">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           <line x1="0" y1="88" x2="100" y2="88" className="days-baseline" vectorEffect="non-scaling-stroke" />
           <polyline points={points.map(({ x, y }) => `${x},${y}`).join(" ")} className="days-line" vectorEffect="non-scaling-stroke" />
         </svg>
-        {points.map(({ x, y }, index) => <span className="days-point" key={items[index].label} style={{ left: `${x}%`, top: `${y}%` }} />)}
+        {points.map(({ x, y }, index) => (
+          <button type="button" className="days-point" key={items[index].value} style={{ left: `${x}%`, top: `${y}%` }}
+            aria-label={`${items[index].label}: ${items[index].count.toLocaleString("pt-BR")} mercadoria${items[index].count === 1 ? "" : "s"}`}
+            aria-pressed={selected?.kind === "days" && selected.value === items[index].value}
+            onClick={() => onSelect({ kind: "days", value: items[index].value })} />
+        ))}
       </div>
-      <ul className="days-labels">{items.map(({ label, count }) => (
-        <li key={label}><span>{label}</span><strong>{count.toLocaleString("pt-BR")} ({(total ? count * 100 / total : 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)</strong></li>
+      <ul className="days-labels">{items.map(({ value, label, count }) => (
+        <li key={value}><button type="button" aria-pressed={selected?.kind === "days" && selected.value === value}
+          onClick={() => onSelect({ kind: "days", value })}>
+          <span>{label}</span><strong>{count.toLocaleString("pt-BR")} ({(total ? count * 100 / total : 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)</strong>
+        </button></li>
       ))}</ul>
     </div>
   );
 }
 
-function TreatmentBars({ items }: { items: { label: string; count: number }[] }) {
+function TreatmentBars({ items, selected, onSelect }: { items: { value: Treatment | null; label: string; count: number }[]; selected: ChartFilter | null; onSelect: (filter: ChartFilter) => void }) {
   const max = Math.max(0, ...items.map((item) => item.count));
   return (
     <div className="vertical-chart-scroll">
       <div className="vertical-chart" aria-label="Quantidade por classificação de tratamento">
-        {items.map(({ label, count }, index) => (
-          <div className="vertical-item" key={label}>
-            <div className="vertical-plot"><strong>{count.toLocaleString("pt-BR")}</strong><div className="vertical-bar" style={{ height: `${max ? count * 145 / max : 0}px`, backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} /></div>
+        {items.map(({ value, label, count }, index) => (
+          <button type="button" className="vertical-item" key={label}
+            aria-pressed={selected?.kind === "treatment" && selected.value === value}
+            onClick={() => onSelect({ kind: "treatment", value })}>
+            <span className="vertical-plot"><strong>{count.toLocaleString("pt-BR")}</strong><span className="vertical-bar" style={{ height: `${max ? count * 145 / max : 0}px`, backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} /></span>
             <span>{label}</span>
-          </div>
+          </button>
         ))}
       </div>
     </div>

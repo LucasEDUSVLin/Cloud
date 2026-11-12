@@ -29,13 +29,13 @@ O tratamento é escolhido manualmente na tabela **Mercadorias** e pode ser alter
 
 O indicador de dias usa exclusivamente `Dias parados` do relatório STUCK, sem incrementar os dias após a importação. O painel apenas compara esse número com 15 dias (abaixo, igual ou acima); não infere LOST nem débito. Nenhum dado é criado: tudo vem dos CSVs.
 
-A **Visão geral** resume as mercadorias, as classificações, os dias parados e os valores da última análise. Os números não mudam com os filtros da tabela.
+A **Visão geral** resume as mercadorias, as classificações e o valor total da última análise. Os números não mudam com os filtros da tabela.
 
-Os gráficos apresentam dados do relatório do dia, sem aplicar os filtros da tabela. A linha compara as quantidades abaixo, exatamente e acima de 15 dias; não representa uma evolução no tempo. As barras verticais mostram cada classificação manual. Dias parados não indicam status LOST nem débito, e classificação manual não significa tratamento concluído.
+Os gráficos apresentam dados do relatório do dia, sem aplicar os filtros da tabela. A linha compara as quantidades abaixo, exatamente e acima de 15 dias; não representa uma evolução no tempo. As barras verticais mostram cada classificação manual. Clique em um ponto, rótulo ou barra para ver as mercadorias correspondentes na tabela. Isso limpa a busca, os filtros e a seleção anteriores; use **Limpar filtro do gráfico** para mostrar todas novamente. Dias parados não indicam status LOST nem débito, e classificação manual não significa tratamento concluído.
 
 Na coluna **Marcação**, escolha uma cor na paleta para pintar a linha inteira do BR. A paleta abre no centro da tela e pode ser fechada pelo botão no canto superior. A marcação é salva por TN neste navegador, permanece enquanto o TN reaparecer nas importações e pode ser removida selecionando **Sem cor**. Ela é apenas visual e não altera tratamento, status nem exportação.
 
-Os indicadores financeiros somam o campo `Valor` do relatório STUCK em reais: o total inclui todos os registros da lista, e a distribuição por status usa o `Status` do CSV atualizado. O débito por LOST considera somente registros cujo status atualizado seja exatamente `LOST` (sem diferenciar maiúsculas de minúsculas); dias parados acima de 15 não são tratados como LOST. Valores fora do formato numérico com ponto decimal e até duas casas são rejeitados para evitar totais incorretos.
+Os valores somam o campo `Valor` do relatório STUCK em reais: o total inclui todos os registros da lista, e a distribuição por status usa o `Status` do CSV atualizado. Valores fora do formato numérico com ponto decimal e até duas casas são rejeitados para evitar totais incorretos.
 
 ## Privacidade e armazenamento
 
