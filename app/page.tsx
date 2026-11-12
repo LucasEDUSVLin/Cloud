@@ -69,6 +69,8 @@ export default function Home() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("stuck-theme");
+      // Read the browser-only preference after hydration to avoid a server/client mismatch.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (saved === "dark" || saved === "light") setTheme(saved);
     } catch {
       setThemeError("Não foi possível carregar a preferência de tema neste navegador.");
