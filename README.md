@@ -6,7 +6,7 @@ Painel para cruzar o relatório de mercadorias paradas da Shopee com um segundo 
 
 1. Selecione o CSV **STUCK** com as colunas `Operação`, `Cidade`, `Entegador`, `TN`, `Status`, `Dias parados`, `Valor`, `Palavra Chave` e `Avaria`.
 2. Selecione o CSV **status atualizado** com as colunas `Order ID`, `Status`, `Driver Name`, `Driver Phone`, `Current Station`, `Current Station Received Time` e `Delivered Time`.
-3. Clique em **Analisar arquivos**. O sistema cruza `TN` com `Order ID`. Cada importação substitui a lista anterior: o painel mostra somente as mercadorias do dia, sem histórico. Classificações e cores já salvas continuam valendo para TNs que reaparecem.
+3. Clique em **Analisar arquivos**. O sistema cruza `TN` com `Order ID` e apresenta uma prévia com as quantidades e os nomes dos arquivos. Confira a prévia e clique em **Confirmar importação**. A lista do painel é substituída; classificações e cores já salvas continuam valendo para TNs que reaparecem.
 
 Após a importação, o formulário fica oculto. Para importar a base do dia, clique em **Atualizar relatórios**.
 
@@ -18,7 +18,13 @@ O CSV exportado contém apenas as colunas e linhas do arquivo de status atualiza
 
 O nome do arquivo segue o formato `Stuck-DD-MM-AAAA-HH-MM.csv`, com a data e o horário locais do dispositivo no momento da exportação.
 
-Os dois CSVs devem ter cabeçalhos, de 1 a 10.000 registros, até 10 MB cada, sem IDs vazios ou duplicados. O processamento verifica ambos antes de mesclar os dados. Pedidos sem correspondência atualizada não recebem status inventado: nos registros novos, o status fica ausente; para registros antigos, o último status conhecido é preservado. Pedidos adicionais no arquivo de status são contados, mas não entram na lista.
+Os dois CSVs devem ter cabeçalhos, de 1 a 10.000 registros, até 10 MB cada, sem IDs vazios ou duplicados. O processamento verifica ambos antes de mesclar os dados. Pedidos sem correspondência no novo arquivo ficam sem status atualizado, mesmo que tenham aparecido anteriormente. Pedidos adicionais no arquivo de status são contados, mas não entram na lista. A prévia informa também a data de modificação fornecida pelo dispositivo, quando disponível, e avisa se for anterior à do arquivo usado na última importação; essa data não comprova quando o relatório foi gerado ou se seus dados estão atualizados.
+
+## Histórico
+
+O painel registra até sete importações confirmadas neste navegador; ao confirmar outra, a mais antiga é removida. As importações anteriores à criação deste recurso não são adicionadas automaticamente. Para cada importação, selecione a data no histórico para comparar com a anterior: TNs novos, ausentes e alterações de status. A ausência de um TN não comprova entrega ou conclusão do tratamento.
+
+O botão **Baixar backup do histórico** salva um JSON com datas, nomes dos arquivos, TNs e status. Guarde-o com segurança: pode conter dados pessoais. **Restaurar backup** substitui o histórico após confirmação, sem alterar o relatório atual, os arquivos CSV salvos ou as marcações. O backup não contém esses arquivos ou marcações e não os restaura. **Apagar histórico** remove somente o histórico; não altera o relatório atual nem as marcações.
 
 O painel exibe, pesquisa e agrupa pelo `Status` do CSV de status atualizado, sem substituí-lo pelo status do relatório STUCK. Pedidos sem correspondência ou sem status nesse CSV mostram "Sem status atualizado".
 
@@ -36,12 +42,12 @@ Os indicadores financeiros somam o campo `Valor` do relatório STUCK em reais: o
 
 ## Privacidade e armazenamento
 
-O site funciona sem login. Os dois arquivos completos da importação mais recente (incluindo linhas adicionais que não entram no painel) e as marcações de tratamento por TN ficam no IndexedDB deste navegador; esses dados podem conter informações pessoais. Os dados não são enviados ao GitHub, mas outra pessoa com acesso ao mesmo perfil de navegador pode vê-los. Os arquivos CSV baixados devem ser protegidos separadamente. Os dados não são sincronizados entre computadores, podem ser apagados ao limpar os dados do site e não substituem backups protegidos dos arquivos originais.
+O site funciona sem login. Os dois arquivos completos da importação mais recente (incluindo linhas adicionais que não entram no painel), o histórico resumido de até sete importações e as marcações por TN ficam no IndexedDB deste navegador; esses dados podem conter informações pessoais. Os dados não são enviados ao GitHub, mas outra pessoa com acesso ao mesmo perfil de navegador pode vê-los. Os arquivos CSV e backups baixados devem ser protegidos separadamente. Os dados não são sincronizados entre computadores, podem ser apagados ao limpar os dados do site e não substituem backups protegidos dos arquivos originais.
 
 O banco da versão anterior não é removido nem migrado; o novo painel usa um banco separado. Sites em caminhos diferentes sob o mesmo domínio `github.io` compartilham a mesma origem e podem acessar o armazenamento uns dos outros. Para proteger dados pessoais, prefira um domínio dedicado e um dispositivo e perfil de navegador de acesso restrito.
 
 ## Desenvolvimento e publicação
 
-Com Node.js 20 ou superior, execute `npm install` e `npm run dev`. Para verificar alterações, execute `npm test`, `npm run lint` e `npm run build`.
+Com Node.js 22.12 ou superior na linha 22, ou Node.js 24 ou 26+, execute `npm install` e `npm run dev`. Para verificar alterações, execute `npm test`, `npm run lint` e `npm run build`.
 
 O fluxo `.github/workflows/pages.yml` gera e publica a aplicação estática no GitHub Pages. Em **Settings → Pages**, selecione **GitHub Actions** como fonte de publicação para evitar que uma publicação da branch sobrescreva a versão gerada.

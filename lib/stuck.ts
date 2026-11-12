@@ -2,6 +2,16 @@ import Papa from "papaparse";
 
 const STUCK_COLUMNS = ["Operação", "Cidade", "Entegador", "TN", "Status", "Dias parados", "Valor", "Palavra Chave", "Avaria"] as const;
 const UPDATED_COLUMNS = ["Order ID", "Status", "Driver Name", "Driver Phone", "Current Station", "Current Station Received Time", "Delivered Time"] as const;
+const currencyFormat = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+export function formatCurrency(cents: number) {
+  if (!Number.isSafeInteger(cents) || cents < 0) throw new Error("Valor em centavos inválido.");
+  const amount = BigInt(cents);
+  const hundred = BigInt(100);
+  const fraction = String(amount % hundred).padStart(2, "0");
+  return currencyFormat.formatToParts(amount / hundred)
+    .map((part) => part.type === "fraction" ? fraction : part.value).join("");
+}
 
 export type StuckRecord = {
   tracking: string;
@@ -34,14 +44,15 @@ export type StuckSnapshot = {
     updatedOriginal?: string[];
   };
   files?: {
-    stuck: { name: string; contents: string };
-    updated: { name: string; contents: string };
+    stuck: { name: string; contents: string; lastModified?: number };
+    updated: { name: string; contents: string; lastModified?: number };
   };
 };
 
 function parseFile(csv: string, columns: readonly string[], label: string) {
+  const contents = csv.replace(/^\uFEFF/, "");
   const originalFields: string[] = [];
-  const parsed = Papa.parse<Record<string, string>>(csv.replace(/^\uFEFF/, ""), {
+  const parsed = Papa.parse<Record<string, string>>(contents, {
     header: true,
     skipEmptyLines: "greedy",
     transformHeader: (header, index) => {
@@ -49,7 +60,31 @@ function parseFile(csv: string, columns: readonly string[], label: string) {
       return header.trim();
     },
   });
-  if (parsed.errors.length) throw new Error(`${label}: ${parsed.errors[0].message}`);
+  const lines: number[] = [];
+  let cursor = 0;
+  let line = 1;
+  let headerSeen = false;
+  const newline = parsed.meta.linebreak;
+  if (newline !== "\n" && newline !== "\r" && newline !== "\r\n") {
+    throw new Error(`${label}: não foi possível identificar as quebras de linha.`);
+  }
+  Papa.parse<string[]>(contents, {
+    delimiter: parsed.meta.delimiter,
+    newline,
+    step: (result) => {
+      const start = line;
+      line += (contents.slice(cursor, result.meta.cursor).match(/\r\n|\r|\n/g) ?? []).length;
+      cursor = result.meta.cursor;
+      if (!result.data.join("").trim()) return;
+      if (!headerSeen) headerSeen = true;
+      else lines.push(start);
+    },
+  });
+  const parseError = parsed.errors[0];
+  if (parseError) {
+    const errorLine = parseError.type === "FieldMismatch" && parseError.row !== undefined ? lines[parseError.row] : undefined;
+    throw new Error(`${label}${errorLine === undefined ? "" : `, linha ${errorLine}`}: ${parseError.message}`);
+  }
   const fields = parsed.meta.fields ?? [];
   const missing = columns.filter((name) => !fields.includes(name));
   if (missing.length) throw new Error(`${label}: faltam as colunas ${missing.join(", ")}.`);
@@ -59,15 +94,15 @@ function parseFile(csv: string, columns: readonly string[], label: string) {
   if (!parsed.data.length || parsed.data.length > 10_000) {
     throw new Error(`${label}: o arquivo deve conter de 1 a 10.000 registros.`);
   }
-  return { rows: parsed.data, fields, originalFields };
+  return { rows: parsed.data, fields, originalFields, lines };
 }
 
-function uniqueMap(rows: Record<string, string>[], column: string, label: string) {
+function uniqueMap(rows: Record<string, string>[], lines: number[], column: string, label: string) {
   const result = new Map<string, Record<string, string>>();
   rows.forEach((row, index) => {
     const key = (row[column] ?? "").trim();
-    if (!key) throw new Error(`${label}: ${column} obrigatório na linha ${index + 2}.`);
-    if (result.has(key)) throw new Error(`${label}: ${column} duplicado na linha ${index + 2}.`);
+    if (!key) throw new Error(`${label}: ${column} obrigatório na linha ${lines[index]}.`);
+    if (result.has(key)) throw new Error(`${label}: ${column} duplicado na linha ${lines[index]}.`);
     result.set(key, row);
   });
   return result;
@@ -76,19 +111,19 @@ function uniqueMap(rows: Record<string, string>[], column: string, label: string
 export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSnapshot {
   const stuckFile = parseFile(stuckCsv, STUCK_COLUMNS, "Arquivo STUCK");
   const updatedFile = parseFile(updatedCsv, UPDATED_COLUMNS, "Arquivo de status");
-  const stuck = uniqueMap(stuckFile.rows, "TN", "Arquivo STUCK");
-  const updates = uniqueMap(updatedFile.rows, "Order ID", "Arquivo de status");
+  const stuck = uniqueMap(stuckFile.rows, stuckFile.lines, "TN", "Arquivo STUCK");
+  const updates = uniqueMap(updatedFile.rows, updatedFile.lines, "Order ID", "Arquivo de status");
   const importedAt = new Date().toISOString();
   const records = [...stuck].map(([tracking, row], index): StuckRecord => {
     const rawDays = (row["Dias parados"] ?? "").trim();
     if (!/^\d+$/.test(rawDays) || !Number.isSafeInteger(Number(rawDays))) {
-      throw new Error(`Arquivo STUCK: Dias parados inválido na linha ${index + 2}.`);
+      throw new Error(`Arquivo STUCK: Dias parados inválido na linha ${stuckFile.lines[index]}.`);
     }
     const value = (row.Valor ?? "").trim();
     try {
       parseValueCents(value);
     } catch (caught) {
-      throw new Error(`Arquivo STUCK: Valor inválido na linha ${index + 2}.`, { cause: caught });
+      throw new Error(`Arquivo STUCK: Valor inválido na linha ${stuckFile.lines[index]}.`, { cause: caught });
     }
     const update = updates.get(tracking);
     const status = (update?.Status ?? "").trim();
@@ -110,6 +145,7 @@ export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSn
       source: { stuck: row, updated: update ?? null },
     };
   });
+  valueTotals(records);
   return {
     records,
     unmatchedUpdates: [...updates.keys()].filter((id) => !stuck.has(id)).length,
@@ -120,7 +156,7 @@ export function processStuckFiles(stuckCsv: string, updatedCsv: string): StuckSn
 
 export function extractTrackingNumbers(stuckCsv: string) {
   const file = parseFile(stuckCsv, STUCK_COLUMNS, "Arquivo STUCK");
-  return [...uniqueMap(file.rows, "TN", "Arquivo STUCK").keys()];
+  return [...uniqueMap(file.rows, file.lines, "TN", "Arquivo STUCK").keys()];
 }
 
 export function exportFilename(date: Date) {
@@ -169,6 +205,9 @@ export function valueTotals(records: readonly StuckRecord[]) {
     const cents = parseValueCents(record.value);
     const status = record.updatedStatus ?? "";
     totalCents += cents;
+    if (!Number.isSafeInteger(totalCents)) {
+      throw new Error("A soma dos valores excede o limite numérico permitido.");
+    }
     byStatus.set(status, (byStatus.get(status) ?? 0) + cents);
     if (status.trim().toLocaleUpperCase("pt-BR") === "LOST") lostCents += cents;
   }

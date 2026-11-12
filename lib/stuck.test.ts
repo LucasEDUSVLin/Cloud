@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Papa from "papaparse";
-import { delivered, exportFilename, exportSelectedCsv, extractTrackingNumbers, parseValueCents, processStuckFiles, risk, valueTotals } from "./stuck";
+import { delivered, exportFilename, exportSelectedCsv, extractTrackingNumbers, formatCurrency, parseValueCents, processStuckFiles, risk, valueTotals } from "./stuck";
 
 const stuckHeader = "Operação,Cidade,Entegador,TN,Status,Dias parados,Valor,Palavra Chave,Avaria";
 const statusHeader = "Order ID,Status,Driver Name,Driver Phone,Current Station,Current Station Received Time,Delivered Time";
@@ -37,6 +37,24 @@ describe("relatórios STUCK", () => {
     expect(() => processStuckFiles([stuckHeader, stuckRow("A", "3,5")].join("\n"), status)).toThrow();
     expect(() => processStuckFiles([stuckHeader, stuckRow("A", "-1")].join("\n"), status)).toThrow("Dias parados inválido");
     expect(() => processStuckFiles([stuckHeader, stuckRow("A", "3")].join("\n"), [statusHeader, statusRow("A", "Delivered"), statusRow("A", "OnHold")].join("\n"))).toThrow("duplicado");
+  });
+
+  it("informa a linha física após linhas vazias e campos com quebras de linha", () => {
+    const status = [statusHeader, statusRow("A", "Delivered"), statusRow("B", "OnHold")].join("\n");
+    const csv = [stuckHeader, 'OP,"Cidade\nCentro",Motorista,A,Hub_Received,3,22.41,null,Não', "", stuckRow("B", "-1")].join("\n");
+    expect(() => processStuckFiles(csv, status)).toThrow("Dias parados inválido na linha 5");
+    expect(() => processStuckFiles(csv.replace(stuckRow("B", "-1"), stuckRow("A", "1")), status)).toThrow("TN duplicado na linha 5");
+    expect(() => processStuckFiles(csv.replace(stuckRow("B", "-1"), "OP,Cidade"), status)).toThrow("Arquivo STUCK, linha 5");
+  });
+
+  it("rejeita uma soma que ultrapasse a precisão inteira mesmo com valores individuais válidos", () => {
+    const csv = [stuckHeader, stuckRow("A", "1").replace("22.41", "90071992547409.90"), stuckRow("B", "1").replace("22.41", "0.03")].join("\n");
+    expect(() => processStuckFiles(csv, [statusHeader, statusRow("A", "LOST"), statusRow("B", "LOST")].join("\n"))).toThrow("soma dos valores excede");
+  });
+
+  it("formata centavos com precisão mesmo perto do limite seguro", () => {
+    expect(formatCurrency(9007199254740991).replace(/\s/g, " ")).toBe("R$ 90.071.992.547.409,91");
+    expect(formatCurrency(5).replace(/\s/g, " ")).toBe("R$ 0,05");
   });
 
   it("extrai os códigos TN do relatório STUCK", () => {
