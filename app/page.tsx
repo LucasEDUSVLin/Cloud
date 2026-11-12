@@ -2,13 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { mergeStuckSnapshots, processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers, valueTotals, exportSelectedCsv, exportFilename } from "@/lib/stuck";
-import { readSnapshot, readTreatments, removeSnapshotRecord, saveSnapshot, setTrackingTreatment } from "@/lib/stuck-storage";
+import { readSnapshot, readTrackingColors, readTreatments, removeSnapshotRecord, saveSnapshot, setTrackingColor, setTrackingTreatment } from "@/lib/stuck-storage";
 import { isTreatment, TREATMENT_OPTIONS, type Treatment } from "@/lib/treatment";
 import { chartCounts } from "@/lib/visualization";
 
 type Filter = "new" | "unclassified" | "classified" | "overdue" | "unmatched" | "all";
 const PAGE_SIZE = 50;
 const currencyFormat = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const CHART_COLORS = ["#6c63ff", "#ff6b6b", "#f7b731", "#20bf6b", "#45aaf2", "#a55eea", "#fd79a8", "#26de81", "#2bcbba", "#fa8231"];
+const MARK_COLORS = [
+  ["#f4cccc", "#fce5cd", "#fff2cc", "#d9ead3", "#d0e0e3", "#c9daf8", "#cfe2f3", "#d9d2e9", "#ead1dc", "#e6b8af"],
+  ["#ea9999", "#f9cb9c", "#ffe599", "#b6d7a8", "#a2c4c9", "#a4c2f4", "#9fc5e8", "#b4a7d6", "#d5a6bd", "#dd7e6b"],
+  ["#e06666", "#f6b26b", "#ffd966", "#93c47d", "#76a5af", "#6d9eeb", "#6fa8dc", "#8e7cc3", "#c27ba0", "#cc4125"],
+  ["#cc0000", "#e69138", "#f1c232", "#6aa84f", "#45818e", "#3c78d8", "#3d85c6", "#674ea7", "#a64d79", "#a61c00"],
+  ["#990000", "#b45f06", "#bf9000", "#38761d", "#134f5c", "#1155cc", "#0b5394", "#351c75", "#741b47", "#85200c"],
+];
 
 function formatCurrency(cents: number) {
   return currencyFormat.format(cents / 100);
@@ -21,6 +29,12 @@ function statusLabel(status: string | null) {
 function formatTime(date: string) {
   const parsed = new Date(date);
   return Number.isNaN(parsed.getTime()) ? "Data indisponível" : parsed.toLocaleString("pt-BR");
+}
+
+function readableTextColor(hex: string) {
+  const [red, green, blue] = hex.slice(1).match(/.{2}/g)!.map((channel) => parseInt(channel, 16));
+  const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
+  return luminance > 0.58 ? "#202a35" : "#ffffff";
 }
 
 function filterRecord(record: StuckRecord, filter: Filter, treatments: ReadonlyMap<string, Treatment>) {
@@ -47,6 +61,7 @@ export default function Home() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [treatments, setTreatments] = useState<Map<string, Treatment>>(() => new Map());
+  const [trackingColors, setTrackingColors] = useState<Map<string, string>>(() => new Map());
   const [treatmentReady, setTreatmentReady] = useState(false);
   const [savingTreatment, setSavingTreatment] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -74,11 +89,12 @@ export default function Home() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([readSnapshot(), readTreatments()])
-      .then(([result, savedTreatments]) => {
+    Promise.all([readSnapshot(), readTreatments(), readTrackingColors()])
+      .then(([result, savedTreatments, savedColors]) => {
         if (active) {
           setSnapshot(result);
           setTreatments(savedTreatments);
+          setTrackingColors(savedColors);
           setTreatmentReady(true);
         }
       })
@@ -102,12 +118,6 @@ export default function Home() {
   }, [snapshot, treatments]);
   const amounts = useMemo(() => valueTotals(snapshot?.records ?? []), [snapshot]);
   const charts = useMemo(() => chartCounts(snapshot?.records ?? [], treatments), [snapshot, treatments]);
-  const heatmapMax = useMemo(() => {
-    let max = 0;
-    for (const row of charts.byStatus.values()) max = Math.max(max, row.below, row.atLimit, row.above);
-    return max;
-  }, [charts]);
-
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
     return (snapshot?.records ?? [])
@@ -218,6 +228,11 @@ export default function Home() {
         next.delete(record.tracking);
         return next;
       });
+      setTrackingColors((previous) => {
+        const next = new Map(previous);
+        next.delete(record.tracking);
+        return next;
+      });
       setNotice(`${record.tracking} foi removido do histórico salvo.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível remover a mercadoria.");
@@ -247,6 +262,21 @@ export default function Home() {
       setError(caught instanceof Error ? caught.message : "Não foi possível salvar o tratamento.");
     } finally {
       setSavingTreatment(false);
+    }
+  }
+
+  async function handleTrackingColor(tracking: string, color: string | null) {
+    setError("");
+    try {
+      await setTrackingColor(tracking, color);
+      setTrackingColors((previous) => {
+        const next = new Map(previous);
+        if (color) next.set(tracking, color);
+        else next.delete(tracking);
+        return next;
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível salvar a cor da mercadoria.");
     }
   }
 
@@ -384,25 +414,6 @@ export default function Home() {
                   ]} />
                 </div>
               </div>
-              <div className="heatmap-section">
-                <h3>Mapa de calor: status atualizado × dias parados</h3>
-                <p className="chart-description">Cada célula mostra a quantidade de mercadorias; quanto mais forte a cor, maior a quantidade em relação às demais células. Selecione um status para filtrar a tabela de mercadorias.</p>
-                <div className="heatmap-scroll">
-                  <table className="heatmap">
-                    <thead><tr><th scope="col">Status atualizado</th><th scope="col">Abaixo de 15 dias</th><th scope="col">Exatamente 15 dias</th><th scope="col">Acima de 15 dias</th></tr></thead>
-                    <tbody>{statuses.map(([status]) => {
-                      const row = charts.byStatus.get(status);
-                      if (!row) return null;
-                      return <tr key={status}>
-                        <th scope="row"><button type="button" className="heatmap-status" aria-pressed={statusFilter === status} onClick={() => selectStatus(status)}>{statusLabel(status || null)}</button></th>
-                        {[row.below, row.atLimit, row.above].map((count, index) => (
-                          <td key={index}><span className={`heat-cell heat-${count ? Math.ceil(count * 4 / heatmapMax) : 0}`}>{count.toLocaleString("pt-BR")}</span></td>
-                        ))}
-                      </tr>;
-                    })}</tbody>
-                  </table>
-                </div>
-              </div>
             </section>
 
             <section className="panel">
@@ -457,7 +468,7 @@ export default function Home() {
                 <>
                   <div className="table-scroll">
                     <table>
-                      <thead><tr><th><span className="sr-only">Selecionar para exportação</span></th><th>Rastreamento</th><th>Tratamento</th><th>Dias parados</th><th>Comparação com 15 dias</th><th>Status atualizado</th><th>Última aparição</th><th>Entregador</th><th>Cidade</th><th>Estação atual</th><th>Avaria</th><th>Valor</th><th>Ação</th></tr></thead>
+                      <thead><tr><th><span className="sr-only">Selecionar para exportação</span></th><th>Rastreamento</th><th>Marcação</th><th>Tratamento</th><th>Dias parados</th><th>Comparação com 15 dias</th><th>Status atualizado</th><th>Última aparição</th><th>Entregador</th><th>Cidade</th><th>Estação atual</th><th>Avaria</th><th>Valor</th><th>Ação</th></tr></thead>
                       <tbody>{visible.map((row) => (
                         <tr key={row.tracking}>
                           <td><input type="checkbox" aria-label={`Selecionar ${row.tracking}`} checked={selected.has(row.tracking)} disabled={!snapshot.exportFields}
@@ -470,7 +481,25 @@ export default function Home() {
                                 return next;
                               });
                             }} /></td>
-                          <td className="order-id">{row.tracking}{row.isNew && !treatments.has(row.tracking) && <span className="new-badge">NOVA</span>}</td>
+                          <td className="order-id" style={trackingColors.has(row.tracking) ? { backgroundColor: trackingColors.get(row.tracking), color: readableTextColor(trackingColors.get(row.tracking)!) } : undefined}>
+                            {row.tracking}{row.isNew && !treatments.has(row.tracking) && <span className="new-badge">NOVA</span>}
+                          </td>
+                          <td>
+                            <details className="color-picker">
+                              <summary aria-label={`Escolher cor para ${row.tracking}`} title={trackingColors.get(row.tracking) ?? "Escolher cor"}>
+                                <span className={`color-picker-current ${trackingColors.has(row.tracking) ? "has-color" : ""}`}
+                                  style={{ backgroundColor: trackingColors.get(row.tracking) ?? "transparent" }} />
+                              </summary>
+                              <div className="color-palette" role="group" aria-label={`Paleta de cores para ${row.tracking}`}>
+                                <button type="button" className="color-swatch no-color" aria-label={`Remover cor de ${row.tracking}`} title="Sem cor" onClick={() => handleTrackingColor(row.tracking, null)} />
+                                {MARK_COLORS.flat().map((color) => (
+                                  <button key={color} type="button" className={`color-swatch ${trackingColors.get(row.tracking) === color ? "selected" : ""}`}
+                                    style={{ backgroundColor: color }} aria-label={`Marcar ${row.tracking} com ${color}`} aria-pressed={trackingColors.get(row.tracking) === color}
+                                    title={color} onClick={() => handleTrackingColor(row.tracking, color)} />
+                                ))}
+                              </div>
+                            </details>
+                          </td>
                           <td><select className="treatment-control" aria-label={`Tratamento ${row.tracking}`}
                             value={treatments.get(row.tracking) ?? ""} disabled={savingTreatment || busy}
                             onChange={(event) => handleTreatment(row, event.target.value)}>
@@ -512,15 +541,15 @@ function Metric({ label, value }: { label: string; value: number | string }) {
 
 function DaysPie({ days, total }: { days: { below: number; atLimit: number; above: number }; total: number }) {
   const slices = [
-    { label: "Abaixo de 15 dias", count: days.below, color: "#82736c" },
-    { label: "Exatamente 15 dias", count: days.atLimit, color: "#b97a08" },
-    { label: "Acima de 15 dias", count: days.above, color: "#b53636" },
+    { label: "Abaixo de 15 dias", count: days.below, color: "#20bf6b" },
+    { label: "Exatamente 15 dias", count: days.atLimit, color: "#f7b731" },
+    { label: "Acima de 15 dias", count: days.above, color: "#ff6b6b" },
   ];
   const below = total ? days.below * 100 / total : 0;
   const atLimit = total ? (days.below + days.atLimit) * 100 / total : 0;
   return (
     <div className="pie-layout">
-      <div className="pie-chart" aria-hidden="true" style={{ background: total ? `conic-gradient(#82736c 0% ${below}%, #b97a08 ${below}% ${atLimit}%, #b53636 ${atLimit}% 100%)` : "#f3eae5" }} />
+      <div className="pie-chart" aria-hidden="true" style={{ background: total ? `conic-gradient(#20bf6b 0% ${below}%, #f7b731 ${below}% ${atLimit}%, #ff6b6b ${atLimit}% 100%)` : "#dce3eb" }} />
       <ul className="pie-legend">{slices.map(({ label, count, color }) => (
         <li key={label}><span className="pie-swatch" style={{ background: color }} aria-hidden="true" /><span>{label}<br /><strong>{count.toLocaleString("pt-BR")} ({(total ? count * 100 / total : 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)</strong></span></li>
       ))}</ul>
@@ -535,7 +564,7 @@ function TreatmentBars({ items }: { items: { label: string; count: number }[] })
       <div className="vertical-chart" aria-label="Quantidade por classificação de tratamento">
         {items.map(({ label, count }, index) => (
           <div className="vertical-item" key={label}>
-            <div className="vertical-plot"><strong>{count.toLocaleString("pt-BR")}</strong><div className={`vertical-bar ${index === 0 ? "unclassified" : ""}`} style={{ height: `${max ? count * 145 / max : 0}px` }} /></div>
+            <div className="vertical-plot"><strong>{count.toLocaleString("pt-BR")}</strong><div className="vertical-bar" style={{ height: `${max ? count * 145 / max : 0}px`, backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} /></div>
             <span>{label}</span>
           </div>
         ))}

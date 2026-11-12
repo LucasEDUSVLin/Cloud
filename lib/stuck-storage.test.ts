@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { processStuckFiles } from "./stuck";
-import { readSnapshot, readTreatments, removeSnapshotRecord, saveSnapshot, setTrackingTreatment } from "./stuck-storage";
+import { readSnapshot, readTrackingColors, readTreatments, removeSnapshotRecord, saveSnapshot, setTrackingColor, setTrackingTreatment } from "./stuck-storage";
 import { TREATMENT_OPTIONS } from "./treatment";
 
 const status = "Order ID,Status,Driver Name,Driver Phone,Current Station,Current Station Received Time,Delivered Time\nA,Delivered,,,Station,,";
@@ -57,13 +57,23 @@ describe("banco local de STUCK", () => {
     }
   });
 
+  it("salva cores por TN, preserva outras cores e valida valores", async () => {
+    await Promise.all([setTrackingColor("A", "#f4cccc"), setTrackingColor("B", "#6d9eeb")]);
+    expect(await readTrackingColors()).toEqual(new Map([["A", "#f4cccc"], ["B", "#6d9eeb"]]));
+    await setTrackingColor("A", null);
+    expect(await readTrackingColors()).toEqual(new Map([["B", "#6d9eeb"]]));
+    await expect(setTrackingColor("B", "red")).rejects.toThrow("Cor de marcação inválida");
+  });
+
   it("remove atomicamente uma mercadoria e sua classificação", async () => {
     const snapshot = processStuckFiles(stuck, status);
     await saveSnapshot(snapshot);
     await setTrackingTreatment("A", "Em análise");
+    await setTrackingColor("A", "#f4cccc");
     await removeSnapshotRecord(snapshot, "A");
     expect((await readSnapshot())?.records).toEqual([]);
     expect(await readTreatments()).toEqual(new Map());
+    expect(await readTrackingColors()).toEqual(new Map());
   });
 
   it("remove somente as antigas marcações, sem apagar o relatório ou classificações novas", async () => {

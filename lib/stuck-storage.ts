@@ -5,6 +5,11 @@ const DATABASE = "stuck-monitor";
 const STORE = "snapshots";
 const LEGACY_TREATMENT_PREFIX = "treated:";
 const TREATMENT_PREFIX = "treatment:";
+const COLOR_PREFIX = "color:";
+
+function isHexColor(value: unknown): value is string {
+  return typeof value === "string" && /^#[\da-f]{6}$/i.test(value);
+}
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -47,6 +52,7 @@ export async function removeSnapshotRecord(snapshot: StuckSnapshot, tracking: st
       const store = transaction.objectStore(STORE);
       store.put({ ...snapshot, records: snapshot.records.filter((record) => record.tracking !== tracking) }, "current");
       store.delete(TREATMENT_PREFIX + tracking);
+      store.delete(COLOR_PREFIX + tracking);
       transaction.oncomplete = () => resolve();
       transaction.onabort = () => reject(new Error("Não foi possível remover a mercadoria salva."));
     });
@@ -94,6 +100,51 @@ export async function readTreatments(): Promise<Map<string, Treatment>> {
       };
       transaction.oncomplete = () => resolve(treatments);
       transaction.onabort = () => reject(new Error("Não foi possível ler os tratamentos salvos. Verifique os dados do navegador."));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export async function readTrackingColors(): Promise<Map<string, string>> {
+  const db = await openDatabase();
+  try {
+    return await new Promise((resolve, reject) => {
+      const colors = new Map<string, string>();
+      const transaction = db.transaction(STORE, "readonly");
+      const request = transaction.objectStore(STORE).openCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        const key = cursor.key;
+        if (typeof key === "string" && key.startsWith(COLOR_PREFIX)) {
+          if (!isHexColor(cursor.value)) {
+            transaction.abort();
+            return;
+          }
+          colors.set(key.slice(COLOR_PREFIX.length), cursor.value);
+        }
+        cursor.continue();
+      };
+      transaction.oncomplete = () => resolve(colors);
+      transaction.onabort = () => reject(new Error("Não foi possível ler as cores salvas. Verifique os dados do navegador."));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export async function setTrackingColor(tracking: string, color: string | null): Promise<void> {
+  if (color !== null && !isHexColor(color)) throw new Error("Cor de marcação inválida.");
+  const db = await openDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(STORE, "readwrite");
+      const store = transaction.objectStore(STORE);
+      if (color !== null) store.put(color, COLOR_PREFIX + tracking);
+      else store.delete(COLOR_PREFIX + tracking);
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(new Error("Não foi possível salvar a cor. Verifique o espaço no navegador."));
     });
   } finally {
     db.close();

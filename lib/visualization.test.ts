@@ -20,9 +20,6 @@ describe("contagens dos gráficos", () => {
     expect(result.classification.get("Perdido")).toBe(1);
     expect(result.classification.get("Entregue")).toBe(0);
     expect([...result.classification.values()].reduce((sum, count) => sum + count, result.unclassified)).toBe(records.length);
-    expect(result.byStatus.get("OnHold")).toEqual({ below: 1, atLimit: 1, above: 0 });
-    expect(result.byStatus.get("Delivered")).toEqual({ below: 0, atLimit: 0, above: 1 });
-    expect(result.byStatus.get("")).toEqual({ below: 1, atLimit: 0, above: 0 });
   });
 
   it("retorna contagens zeradas sem mercadorias", () => {
@@ -30,6 +27,5 @@ describe("contagens dos gráficos", () => {
     expect(result.days).toEqual({ below: 0, atLimit: 0, above: 0 });
     expect(result.unclassified).toBe(0);
     expect([...result.classification.values()].every((count) => count === 0)).toBe(true);
-    expect(result.byStatus.size).toBe(0);
   });
 });
