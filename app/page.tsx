@@ -449,20 +449,25 @@ export default function Home() {
                             {row.tracking}
                           </td>
                           <td>
-                            <details className="color-picker">
-                              <summary aria-label={`Escolher cor para ${row.tracking}`} title={trackingColors.get(row.tracking) ?? "Escolher cor"}>
+                            <div className="color-picker">
+                              <button type="button" className="color-picker-button" popoverTarget={`palette-${encodeURIComponent(row.tracking)}`}
+                                aria-label={`Escolher cor para ${row.tracking}`} title={trackingColors.get(row.tracking) ?? "Escolher cor"}>
                                 <span className={`color-picker-current ${trackingColors.has(row.tracking) ? "has-color" : ""}`}
                                   style={{ backgroundColor: trackingColors.get(row.tracking) ?? "transparent" }} />
-                              </summary>
-                              <div className="color-palette" role="group" aria-label={`Paleta de cores para ${row.tracking}`}>
-                                <button type="button" className="color-swatch no-color" aria-label={`Remover cor de ${row.tracking}`} title="Sem cor" onClick={() => handleTrackingColor(row.tracking, null)} />
+                              </button>
+                              <div id={`palette-${encodeURIComponent(row.tracking)}`} popover="auto" className="color-palette" role="group" aria-label={`Paleta de cores para ${row.tracking}`}>
+                                <span className="color-palette-title">Marcação: {row.tracking}</span>
+                                <button type="button" className="color-palette-close" aria-label="Fechar paleta" popoverTarget={`palette-${encodeURIComponent(row.tracking)}`} popoverTargetAction="hide">×</button>
+                                <button type="button" className="color-swatch no-color" aria-label={`Remover cor de ${row.tracking}`} title="Sem cor"
+                                  popoverTarget={`palette-${encodeURIComponent(row.tracking)}`} popoverTargetAction="hide" onClick={() => handleTrackingColor(row.tracking, null)} />
                                 {MARK_COLORS.flat().map((color) => (
                                   <button key={color} type="button" className={`color-swatch ${trackingColors.get(row.tracking) === color ? "selected" : ""}`}
                                     style={{ backgroundColor: color }} aria-label={`Marcar ${row.tracking} com ${color}`} aria-pressed={trackingColors.get(row.tracking) === color}
-                                    title={color} onClick={() => handleTrackingColor(row.tracking, color)} />
+                                    title={color} popoverTarget={`palette-${encodeURIComponent(row.tracking)}`} popoverTargetAction="hide"
+                                    onClick={() => handleTrackingColor(row.tracking, color)} />
                                 ))}
                               </div>
-                            </details>
+                            </div>
                           </td>
                           <td><select className="treatment-control" aria-label={`Tratamento ${row.tracking}`}
                             value={treatments.get(row.tracking) ?? ""} disabled={savingTreatment || busy}

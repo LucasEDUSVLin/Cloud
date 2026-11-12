@@ -30,7 +30,7 @@ O indicador de dias usa exclusivamente `Dias parados` do relatório STUCK, sem i
 
 Os gráficos apresentam dados do relatório do dia, sem aplicar os filtros da tabela. A pizza compara os dias parados com 15 dias em verde, amarelo e coral; as barras verticais usam cores diferentes para cada classificação manual. As cores de dias não indicam status LOST nem débito, e classificação manual não significa tratamento concluído.
 
-Na coluna **Marcação**, escolha uma cor na paleta para pintar a linha inteira do BR. A marcação é salva por TN neste navegador, permanece enquanto o TN reaparecer nas importações e pode ser removida selecionando **Sem cor**. Ela é apenas visual e não altera tratamento, status nem exportação.
+Na coluna **Marcação**, escolha uma cor na paleta para pintar a linha inteira do BR. A paleta abre no centro da tela e pode ser fechada pelo botão no canto superior. A marcação é salva por TN neste navegador, permanece enquanto o TN reaparecer nas importações e pode ser removida selecionando **Sem cor**. Ela é apenas visual e não altera tratamento, status nem exportação.
 
 Os indicadores financeiros somam o campo `Valor` do relatório STUCK em reais: o total inclui todos os registros da lista, e a distribuição por status usa o `Status` do CSV atualizado. O débito por LOST considera somente registros cujo status atualizado seja exatamente `LOST` (sem diferenciar maiúsculas de minúsculas); dias parados acima de 15 não são tratados como LOST. Valores fora do formato numérico com ponto decimal e até duas casas são rejeitados para evitar totais incorretos.
 
