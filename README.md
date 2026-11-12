@@ -29,6 +29,8 @@ O tratamento é escolhido manualmente na tabela **Mercadorias** e pode ser alter
 
 O indicador de dias usa exclusivamente `Dias parados` do relatório STUCK, sem incrementar os dias após a importação. O painel apenas compara esse número com 15 dias (abaixo, igual ou acima); não infere LOST nem débito. Nenhum dado é criado: tudo vem dos CSVs.
 
+A **Visão geral** resume as mercadorias, as classificações, os dias parados e os valores da última análise. Os números não mudam com os filtros da tabela.
+
 Os gráficos apresentam dados do relatório do dia, sem aplicar os filtros da tabela. A pizza compara os dias parados com 15 dias em verde, amarelo e coral; as barras verticais usam cores diferentes para cada classificação manual. As cores de dias não indicam status LOST nem débito, e classificação manual não significa tratamento concluído.
 
 Na coluna **Marcação**, escolha uma cor na paleta para pintar a linha inteira do BR. A paleta abre no centro da tela e pode ser fechada pelo botão no canto superior. A marcação é salva por TN neste navegador, permanece enquanto o TN reaparecer nas importações e pode ser removida selecionando **Sem cor**. Ela é apenas visual e não altera tratamento, status nem exportação.

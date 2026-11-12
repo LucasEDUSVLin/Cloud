@@ -371,20 +371,20 @@ export default function Home() {
         {loading ? <p className="empty-state" role="status">Carregando dados salvos...</p> : snapshot ? (
           <>
             <div className="section-title">
-              <div><h2>Visão geral</h2><p className="muted">Última importação neste navegador: {formatTime(snapshot.importedAt)}</p></div>
+              <div><h2>Visão geral</h2><p className="muted">Última análise: {formatTime(snapshot.importedAt)}</p></div>
             </div>
             <div className="metric-grid">
-              <Metric label="No relatório STUCK" value={counts.total} />
+              <Metric label="Mercadorias" value={counts.total} />
               <Metric label="Sem classificação" value={counts.unclassified} />
               <Metric label="Classificadas" value={counts.classified} />
               <Metric label="Acima de 15 dias" value={counts.overdue} />
               <Metric label="Valor total" value={amounts.values ? formatCurrency(amounts.values.totalCents) : "Indisponível"} />
-              <Metric label="Débito por status LOST" value={amounts.values ? formatCurrency(amounts.values.lostCents) : "Indisponível"} />
+              <Metric label="Débito por LOST" value={amounts.values ? formatCurrency(amounts.values.lostCents) : "Indisponível"} />
             </div>
             <div className="summary-notes">
-              <p><strong>{counts.limit}</strong> com 15 dias. <strong>{counts.unmatched}</strong> sem status atualizado.</p>
-              {snapshot.unmatchedUpdates > 0 && <p>{snapshot.unmatchedUpdates} pedido(s) extras no arquivo de status foram ignorados.</p>}
-              <p>O tratamento é manual. Uma nova importação substitui a lista.</p>
+              <p><strong>{counts.limit.toLocaleString("pt-BR")}</strong> com exatamente 15 dias · <strong>{counts.unmatched.toLocaleString("pt-BR")}</strong> sem status atualizado</p>
+              {snapshot.unmatchedUpdates > 0 && <p>{snapshot.unmatchedUpdates.toLocaleString("pt-BR")} {snapshot.unmatchedUpdates === 1 ? "pedido extra ignorado" : "pedidos extras ignorados"} no arquivo de status.</p>}
+              <p>Classificação manual · Novas análises substituem a lista</p>
             </div>
 
             <section className="panel charts-panel">
