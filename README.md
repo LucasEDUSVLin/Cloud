@@ -47,4 +47,4 @@ O banco da versão anterior não é removido nem migrado; o novo painel usa um b
 
 Com Node.js 22.12 ou superior na linha 22, ou Node.js 24 ou 26+, execute `npm install` e `npm run dev`. Para verificar alterações, execute `npm test`, `npm run lint` e `npm run build`.
 
-O fluxo `.github/workflows/pages.yml` gera e publica a aplicação estática no GitHub Pages. Em **Settings → Pages**, selecione **GitHub Actions** como fonte de publicação para evitar que uma publicação da branch sobrescreva a versão gerada.
+O fluxo `.github/workflows/pages.yml` gera e publica a aplicação estática no GitHub Pages em `https://lucasedusvlin.github.io/STUCK/`. Em **Settings → Pages**, selecione **GitHub Actions** como fonte de publicação para evitar que uma publicação da branch sobrescreva a versão gerada.
