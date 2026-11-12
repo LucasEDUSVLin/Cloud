@@ -2,11 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { processStuckFiles, risk, type StuckRecord, type StuckSnapshot, extractTrackingNumbers, valueTotals, exportSelectedCsv, exportFilename, formatCurrency } from "@/lib/stuck";
-import { readHistory, readSnapshot, readTrackingColors, readTreatments, saveSnapshot, setTrackingColor, setTrackingTreatment } from "@/lib/stuck-storage";
-import type { HistoryEntry } from "@/lib/history";
+import { readSnapshot, readTrackingColors, readTreatments, saveSnapshot, setTrackingColor, setTrackingTreatment } from "@/lib/stuck-storage";
 import { isTreatment, TREATMENT_OPTIONS, type Treatment } from "@/lib/treatment";
 import { chartCounts } from "@/lib/visualization";
-import HistoryPanel from "./history-panel";
 
 type Filter = "unclassified" | "classified" | "overdue" | "unmatched" | "all";
 const PAGE_SIZE = 50;
@@ -26,12 +24,6 @@ function statusLabel(status: string | null) {
 function formatTime(date: string) {
   const parsed = new Date(date);
   return Number.isNaN(parsed.getTime()) ? "Data indisponível" : parsed.toLocaleString("pt-BR");
-}
-
-function formatModified(timestamp: number | undefined) {
-  if (timestamp === undefined) return "indisponível";
-  const date = new Date(timestamp);
-  return Number.isNaN(date.getTime()) ? "indisponível" : date.toLocaleString("pt-BR");
 }
 
 function readableTextColor(hex: string) {
@@ -54,10 +46,6 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [stuckFile, setStuckFile] = useState<File | null>(null);
   const [statusFile, setStatusFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<StuckSnapshot | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [historyReady, setHistoryReady] = useState(false);
-  const [historyAvailable, setHistoryAvailable] = useState(true);
   const [importOpen, setImportOpen] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -108,10 +96,6 @@ export default function Home() {
       })
       .catch((caught) => { if (active) setError(caught instanceof Error ? caught.message : "Falha ao ler o banco local."); })
       .finally(() => { if (active) setLoading(false); });
-    readHistory()
-      .then((entries) => { if (active) setHistory(entries); })
-      .catch((caught) => { if (active) { setHistoryAvailable(false); setError(caught instanceof Error ? caught.message : "Falha ao ler o histórico."); } })
-      .finally(() => { if (active) setHistoryReady(true); });
     return () => { active = false; };
   }, []);
 
@@ -176,7 +160,6 @@ export default function Home() {
     event.preventDefault();
     setError("");
     setNotice("");
-    setPreview(null);
     if ((!stuckFile && !snapshot?.files?.stuck) || (!statusFile && !snapshot?.files?.updated)) {
       setError("Selecione os dois arquivos CSV.");
       return;
@@ -187,27 +170,12 @@ export default function Home() {
     }
     setBusy(true);
     try {
-      const stuck = stuckFile ? { name: stuckFile.name, contents: await stuckFile.text(), lastModified: stuckFile.lastModified } : snapshot?.files?.stuck;
-      const updated = statusFile ? { name: statusFile.name, contents: await statusFile.text(), lastModified: statusFile.lastModified } : snapshot?.files?.updated;
+      const stuck = stuckFile ? { name: stuckFile.name, contents: await stuckFile.text() } : snapshot?.files?.stuck;
+      const updated = statusFile ? { name: statusFile.name, contents: await statusFile.text() } : snapshot?.files?.updated;
       if (!stuck || !updated) throw new Error("Selecione os dois arquivos CSV.");
       const imported = { ...processStuckFiles(stuck.contents, updated.contents), files: { stuck, updated } };
-      setPreview(imported);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Não foi possível analisar os arquivos.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function confirmImport() {
-    if (!preview) return;
-    setError("");
-    setBusy(true);
-    try {
-      const imported = { ...preview, importedAt: new Date().toISOString() };
-      const savedHistory = await saveSnapshot(imported);
+      await saveSnapshot(imported);
       setSnapshot(imported);
-      setHistory(savedHistory);
       setFilter("all");
       setStatusFilter(null);
       setSearch("");
@@ -215,7 +183,6 @@ export default function Home() {
       setSelected(new Set());
       setStuckFile(null);
       setStatusFile(null);
-      setPreview(null);
       setImportOpen(false);
       setNotice(`Importação concluída: ${imported.records.length.toLocaleString("pt-BR")} mercadoria(s) do dia.`);
     } catch (caught) {
@@ -330,7 +297,6 @@ export default function Home() {
                 if (importOpen) {
                   setStuckFile(null);
                   setStatusFile(null);
-                  setPreview(null);
                   setError("");
                   setNotice("");
                 }
@@ -350,48 +316,26 @@ export default function Home() {
         {!loading && (!snapshot || importOpen) && <section id="import-reports" className="panel import-panel">
           <div>
             <h2>Importar relatórios</h2>
-            <p className="muted">Selecione o relatório STUCK e o CSV com os status atualizados. Os arquivos salvos podem ser reutilizados; selecione apenas os que deseja substituir.</p>
+            <p className="muted">Selecione o relatório principal, copie os BRs e, após consultar os status, selecione o arquivo atualizado.</p>
           </div>
           <form onSubmit={handleImport} className="import-form">
             <div className="file-row">
               <label className="file-field">
-                <span>1. Relatório STUCK da Shopee</span>
+                <span>1. Relatório principal (STUCK)</span>
                 {snapshot?.files?.stuck && <span className="saved-file">Salvo: {snapshot.files.stuck.name}</span>}
-                <input type="file" accept=".csv,text/csv" onChange={(event) => { setStuckFile(event.target.files?.[0] ?? null); setPreview(null); }} disabled={busy} />
+                <input type="file" accept=".csv,text/csv" onChange={(event) => setStuckFile(event.target.files?.[0] ?? null)} disabled={busy} />
               </label>
-              <button type="button" className="secondary-button" onClick={handleCopyTn} disabled={busy || (!stuckFile && !snapshot?.files?.stuck)}>Copiar TN (BR)</button>
+              <button type="button" className="secondary-button" onClick={handleCopyTn} disabled={busy || (!stuckFile && !snapshot?.files?.stuck)}>Copiar BRs</button>
             </div>
             <label className="file-field">
-              <span>2. Status atualizado dos pedidos</span>
+              <span>2. Arquivo de status atualizado</span>
               {snapshot?.files?.updated && <span className="saved-file">Salvo: {snapshot.files.updated.name}</span>}
-              <input type="file" accept=".csv,text/csv" onChange={(event) => { setStatusFile(event.target.files?.[0] ?? null); setPreview(null); }} disabled={busy} />
+              <input type="file" accept=".csv,text/csv" onChange={(event) => setStatusFile(event.target.files?.[0] ?? null)} disabled={busy} />
             </label>
-            <button type="submit" className="primary-button" disabled={busy || loading || !historyReady || savingTreatment || !treatmentReady || (!stuckFile && !snapshot?.files?.stuck) || (!statusFile && !snapshot?.files?.updated) || (!stuckFile && !statusFile)}>
+            <button type="submit" className="primary-button" disabled={busy || loading || savingTreatment || !treatmentReady || (!stuckFile && !snapshot?.files?.stuck) || (!statusFile && !snapshot?.files?.updated) || (!stuckFile && !statusFile)}>
               {busy ? "Processando..." : "Analisar arquivos"}
             </button>
           </form>
-          {preview?.files && (
-            <div className="import-preview">
-              <h3>Prévia da importação</h3>
-              <p>{preview.records.length.toLocaleString("pt-BR")} mercadoria(s); {preview.records.filter((row) => !row.source?.updated).length.toLocaleString("pt-BR")} sem correspondência no arquivo de status; {preview.records.filter((row) => row.source?.updated && !row.updatedStatus).length.toLocaleString("pt-BR")} com status vazio; {preview.unmatchedUpdates.toLocaleString("pt-BR")} pedido(s) adicionais no arquivo de status.</p>
-              {preview.records.some((row) => !row.source?.updated) && (
-                <details className="preview-missing">
-                  <summary>Ver TNs sem correspondência</summary>
-                  <ul>{preview.records.filter((row) => !row.source?.updated).map((row) => <li key={row.tracking}>{row.tracking}</li>)}</ul>
-                </details>
-              )}
-              {([["STUCK", preview.files.stuck, snapshot?.files?.stuck, stuckFile], ["Status", preview.files.updated, snapshot?.files?.updated, statusFile]] as const).map(([label, file, previousFile, selectedFile]) => (
-                <p key={label}><strong>{label}:</strong> {file.name} {selectedFile ? "(selecionado)" : "(reutilizado)"} — modificação informada pelo dispositivo: {formatModified(file.lastModified)}.
-                  {selectedFile && previousFile?.lastModified !== undefined && file.lastModified !== undefined && file.lastModified < previousFile.lastModified && " Atenção: a modificação é anterior à do arquivo usado na última importação."}
-                </p>
-              ))}
-              <p>A data de modificação não comprova a data dos dados. Confirme se os relatórios estão corretos antes de substituir a lista atual.</p>
-              <div className="selection-bar">
-                <button type="button" className="primary-button" disabled={busy} onClick={confirmImport}>Confirmar importação</button>
-                <button type="button" className="secondary-button" disabled={busy} onClick={() => setPreview(null)}>Cancelar prévia</button>
-              </div>
-            </div>
-          )}
         </section>}
 
         {error && <p className="error message" role="alert">{error}</p>}
@@ -555,7 +499,6 @@ export default function Home() {
             </section>
           </>
         ) : !error && <p className="empty-state">Importe os dois relatórios para visualizar as mercadorias em STUCK.</p>}
-        {!loading && historyReady && <HistoryPanel entries={history} onChange={(entries) => { setHistory(entries); setHistoryAvailable(true); }} busy={busy} setBusy={setBusy} available={historyAvailable} />}
       </section>
     </main>
   );

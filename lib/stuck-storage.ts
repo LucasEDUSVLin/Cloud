@@ -1,5 +1,4 @@
 import type { StuckSnapshot } from "./stuck";
-import { HISTORY_LIMIT, historyEntry, parseHistoryBackup, type HistoryEntry } from "./history";
 import { isTreatment, type Treatment } from "./treatment";
 
 const DATABASE = "stuck-monitor";
@@ -31,65 +30,14 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveSnapshot(snapshot: StuckSnapshot): Promise<HistoryEntry[]> {
-  const entry = historyEntry(snapshot);
-  const db = await openDatabase();
-  try {
-    return await new Promise<HistoryEntry[]>((resolve, reject) => {
-      const transaction = db.transaction(STORE, "readwrite");
-      let updatedHistory: HistoryEntry[] = [];
-      let abortMessage = "Não foi possível salvar. Verifique o espaço no navegador.";
-      transaction.oncomplete = () => resolve(updatedHistory);
-      transaction.onabort = () => reject(new Error(abortMessage));
-      const store = transaction.objectStore(STORE);
-      const request = store.get("history");
-      request.onsuccess = () => {
-        try {
-          const history = request.result === undefined ? [] : parseHistoryBackup(JSON.stringify({ version: 1, entries: request.result }));
-          store.put(snapshot, "current");
-          updatedHistory = [entry, ...history].slice(0, HISTORY_LIMIT);
-          store.put(updatedHistory, "history");
-        } catch {
-          abortMessage = "Não foi possível salvar: o histórico local está inválido. Restaure ou apague o histórico.";
-          transaction.abort();
-        }
-      };
-    });
-  } finally {
-    db.close();
-  }
-}
-
-export async function readHistory(): Promise<HistoryEntry[]> {
-  const db = await openDatabase();
-  try {
-    return await new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE, "readonly");
-      const request = transaction.objectStore(STORE).get("history");
-      request.onsuccess = () => {
-        try {
-          resolve(request.result === undefined ? [] : parseHistoryBackup(JSON.stringify({ version: 1, entries: request.result })));
-        } catch {
-          reject(new Error("Não foi possível ler o histórico salvo. Verifique os dados do navegador."));
-        }
-      };
-      request.onerror = () => reject(new Error("Não foi possível ler o histórico salvo."));
-      transaction.onabort = () => reject(new Error("A leitura do histórico foi interrompida."));
-    });
-  } finally {
-    db.close();
-  }
-}
-
-export async function replaceHistory(entries: HistoryEntry[]): Promise<void> {
-  const validated = parseHistoryBackup(JSON.stringify({ version: 1, entries }));
+export async function saveSnapshot(snapshot: StuckSnapshot): Promise<void> {
   const db = await openDatabase();
   try {
     await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(STORE, "readwrite");
-      transaction.objectStore(STORE).put(validated, "history");
       transaction.oncomplete = () => resolve();
-      transaction.onabort = () => reject(new Error("Não foi possível salvar o histórico. Verifique o espaço no navegador."));
+      transaction.onabort = () => reject(new Error("Não foi possível salvar. Verifique o espaço no navegador."));
+      transaction.objectStore(STORE).put(snapshot, "current");
     });
   } finally {
     db.close();

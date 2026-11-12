@@ -44,8 +44,8 @@ export type StuckSnapshot = {
     updatedOriginal?: string[];
   };
   files?: {
-    stuck: { name: string; contents: string; lastModified?: number };
-    updated: { name: string; contents: string; lastModified?: number };
+    stuck: { name: string; contents: string };
+    updated: { name: string; contents: string };
   };
 };
 

@@ -5,8 +5,9 @@ Painel para cruzar o relatório de mercadorias paradas da Shopee com um segundo 
 ## Utilização
 
 1. Selecione o CSV **STUCK** com as colunas `Operação`, `Cidade`, `Entegador`, `TN`, `Status`, `Dias parados`, `Valor`, `Palavra Chave` e `Avaria`.
-2. Selecione o CSV **status atualizado** com as colunas `Order ID`, `Status`, `Driver Name`, `Driver Phone`, `Current Station`, `Current Station Received Time` e `Delivered Time`.
-3. Clique em **Analisar arquivos**. O sistema cruza `TN` com `Order ID` e apresenta uma prévia com as quantidades e os nomes dos arquivos. Confira a prévia e clique em **Confirmar importação**. A lista do painel é substituída; classificações e cores já salvas continuam valendo para TNs que reaparecem.
+2. Clique em **Copiar BRs** para copiar os códigos TN, um por linha, e consultar os status atualizados na Shopee.
+3. Selecione o CSV **status atualizado** com as colunas `Order ID`, `Status`, `Driver Name`, `Driver Phone`, `Current Station`, `Current Station Received Time` e `Delivered Time`.
+4. Clique em **Analisar arquivos**. O sistema cruza `TN` com `Order ID` e mostra as mercadorias. A lista do painel é substituída; classificações e cores já salvas continuam valendo para TNs que reaparecem.
 
 Após a importação, o formulário fica oculto. Para importar a base do dia, clique em **Atualizar relatórios**.
 
@@ -18,19 +19,11 @@ O CSV exportado contém apenas as colunas e linhas do arquivo de status atualiza
 
 O nome do arquivo segue o formato `Stuck-DD-MM-AAAA-HH-MM.csv`, com a data e o horário locais do dispositivo no momento da exportação.
 
-Os dois CSVs devem ter cabeçalhos, de 1 a 10.000 registros, até 10 MB cada, sem IDs vazios ou duplicados. O processamento verifica ambos antes de mesclar os dados. Pedidos sem correspondência no novo arquivo ficam sem status atualizado, mesmo que tenham aparecido anteriormente. Pedidos adicionais no arquivo de status são contados, mas não entram na lista. A prévia informa também a data de modificação fornecida pelo dispositivo, quando disponível, e avisa se for anterior à do arquivo usado na última importação; essa data não comprova quando o relatório foi gerado ou se seus dados estão atualizados.
-
-## Histórico
-
-O painel registra até sete importações confirmadas neste navegador; ao confirmar outra, a mais antiga é removida. As importações anteriores à criação deste recurso não são adicionadas automaticamente. Para cada importação, selecione a data no histórico para comparar com a anterior: TNs novos, ausentes e alterações de status. A ausência de um TN não comprova entrega ou conclusão do tratamento.
-
-O botão **Baixar backup do histórico** salva um JSON com datas, nomes dos arquivos, TNs e status. Guarde-o com segurança: pode conter dados pessoais. **Restaurar backup** substitui o histórico após confirmação, sem alterar o relatório atual, os arquivos CSV salvos ou as marcações. O backup não contém esses arquivos ou marcações e não os restaura. **Apagar histórico** remove somente o histórico; não altera o relatório atual nem as marcações.
+Os dois CSVs devem ter cabeçalhos, de 1 a 10.000 registros, até 10 MB cada, sem IDs vazios ou duplicados. O processamento verifica ambos antes de mesclar os dados. Pedidos sem correspondência no novo arquivo ficam sem status atualizado, mesmo que tenham aparecido anteriormente. Pedidos adicionais no arquivo de status são contados, mas não entram na lista.
 
 O painel exibe, pesquisa e agrupa pelo `Status` do CSV de status atualizado, sem substituí-lo pelo status do relatório STUCK. Pedidos sem correspondência ou sem status nesse CSV mostram "Sem status atualizado".
 
 O tratamento é escolhido manualmente na tabela **Mercadorias** e pode ser alterado ou voltado para **Sem classificação**. A escolha não altera o status da Shopee e é salva por TN neste navegador. As contagens abrangem o relatório do dia e não indicam conclusão do tratamento. Os filtros de dias incluem todo o relatório, independentemente do tratamento ou do status atualizado. Selecionar para exportação é independente da classificação; o CSV exportado contém os dados do arquivo de status atualizado, não a classificação manual.
-
-O botão **Copiar TN (BR)**, ao lado do relatório STUCK, copia os códigos TN do arquivo selecionado (um por linha) para consultar o status atualizado na Shopee.
 
 O indicador de dias usa exclusivamente `Dias parados` do relatório STUCK, sem incrementar os dias após a importação. O painel apenas compara esse número com 15 dias (abaixo, igual ou acima); não infere LOST nem débito. Nenhum dado é criado: tudo vem dos CSVs.
 
@@ -42,7 +35,7 @@ Os indicadores financeiros somam o campo `Valor` do relatório STUCK em reais: o
 
 ## Privacidade e armazenamento
 
-O site funciona sem login. Os dois arquivos completos da importação mais recente (incluindo linhas adicionais que não entram no painel), o histórico resumido de até sete importações e as marcações por TN ficam no IndexedDB deste navegador; esses dados podem conter informações pessoais. Os dados não são enviados ao GitHub, mas outra pessoa com acesso ao mesmo perfil de navegador pode vê-los. Os arquivos CSV e backups baixados devem ser protegidos separadamente. Os dados não são sincronizados entre computadores, podem ser apagados ao limpar os dados do site e não substituem backups protegidos dos arquivos originais.
+O site funciona sem login. Os dois arquivos completos da importação mais recente (incluindo linhas adicionais que não entram no painel) e as marcações por TN ficam no IndexedDB deste navegador; esses dados podem conter informações pessoais. O histórico criado pela versão anterior não é exibido nem atualizado, mas permanece salvo para não apagar dados existentes. Os dados não são enviados ao GitHub, mas outra pessoa com acesso ao mesmo perfil de navegador pode vê-los. Os arquivos CSV e backups baixados devem ser protegidos separadamente. Os dados não são sincronizados entre computadores, podem ser apagados ao limpar os dados do site e não substituem backups protegidos dos arquivos originais.
 
 O banco da versão anterior não é removido nem migrado; o novo painel usa um banco separado. Sites em caminhos diferentes sob o mesmo domínio `github.io` compartilham a mesma origem e podem acessar o armazenamento uns dos outros. Para proteger dados pessoais, prefira um domínio dedicado e um dispositivo e perfil de navegador de acesso restrito.
 

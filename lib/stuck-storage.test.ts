@@ -1,8 +1,7 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { processStuckFiles } from "./stuck";
-import { readHistory, readSnapshot, readTrackingColors, readTreatments, replaceHistory, saveSnapshot, setTrackingColor, setTrackingTreatment } from "./stuck-storage";
-import { compareHistory, parseHistoryBackup } from "./history";
+import { readSnapshot, readTrackingColors, readTreatments, saveSnapshot, setTrackingColor, setTrackingTreatment } from "./stuck-storage";
 import { TREATMENT_OPTIONS } from "./treatment";
 
 const status = "Order ID,Status,Driver Name,Driver Phone,Current Station,Current Station Received Time,Delivered Time\nA,Delivered,,,Station,,";
@@ -66,24 +65,9 @@ describe("banco local de STUCK", () => {
     await expect(setTrackingColor("B", "red")).rejects.toThrow("Cor de marcação inválida");
   });
 
-  it("guarda as sete últimas importações e compara novos, ausentes e mudanças de status", async () => {
-    for (let i = 0; i < 7; i++) await saveSnapshot(processStuckFiles(stuck, status));
-    const oldestId = (await readHistory())[6].id;
-    const changed = processStuckFiles(`${stuck}\nX,Cidade,Nome,B,OnHold,4,10,null,Não`, status.replace("A,Delivered", "A,OnHold") + "\nB,Delivered,,,Station,,");
-    await saveSnapshot(changed);
-    const history = await readHistory();
-    expect(history).toHaveLength(7);
-    expect(history.some((entry) => entry.id === oldestId)).toBe(false);
-    expect(compareHistory(history[0], history[1])).toEqual({
-      added: ["B"], removed: [], changed: [{ tracking: "A", before: "Delivered", after: "OnHold" }],
-    });
-    expect(compareHistory(history[1], history[0]).removed).toEqual(["B"]);
-    expect(await readSnapshot()).toEqual(changed);
-  });
-
-  it("não substitui o relatório quando o histórico armazenado é inválido", async () => {
-    const original = processStuckFiles(stuck, status);
-    await saveSnapshot(original);
+  it("não altera o histórico anterior nem impede a importação se ele for inválido", async () => {
+    const snapshot = processStuckFiles(stuck, status);
+    await saveSnapshot(snapshot);
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open("stuck-monitor", 1);
       request.onsuccess = () => resolve(request.result);
@@ -95,26 +79,16 @@ describe("banco local de STUCK", () => {
       transaction.oncomplete = () => resolve();
       transaction.onabort = () => reject(transaction.error);
     });
+    const updated = processStuckFiles(stuck.replace(",3,", ",16,"), status);
+    await saveSnapshot(updated);
+    expect(await readSnapshot()).toEqual(updated);
+    const history = await new Promise<unknown>((resolve, reject) => {
+      const request = db.transaction("snapshots").objectStore("snapshots").get("history");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
     db.close();
-    await expect(saveSnapshot(processStuckFiles(stuck.replace(",3,", ",16,"), status))).rejects.toThrow("histórico local está inválido");
-    expect(await readSnapshot()).toEqual(original);
-  });
-
-  it("valida, restaura e apaga apenas o histórico", async () => {
-    const snapshot = processStuckFiles(stuck, status);
-    await saveSnapshot(snapshot);
-    await setTrackingTreatment("A", "Em análise");
-    const entries = await readHistory();
-    const backup = JSON.stringify({ version: 1, entries });
-    await replaceHistory([]);
-    expect(await readHistory()).toEqual([]);
-    await replaceHistory(parseHistoryBackup(backup));
-    expect(await readHistory()).toEqual(entries);
-    expect(await readSnapshot()).toEqual(snapshot);
-    expect((await readTreatments()).get("A")).toBe("Em análise");
-    expect(() => parseHistoryBackup("{")).toThrow("JSON válido");
-    expect(() => parseHistoryBackup(JSON.stringify({ version: 1, entries: [...entries, entries[0]] }))).toThrow("inválida");
-    expect(() => parseHistoryBackup(JSON.stringify({ version: 1, entries: Array(8).fill(entries[0]) }))).toThrow("limite");
+    expect(history).toBe("inválido");
   });
 
   it("remove somente as antigas marcações, sem apagar o relatório ou classificações novas", async () => {

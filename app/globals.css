@@ -113,20 +113,6 @@ h1, h2 { font-family: Arial, Helvetica, sans-serif; }
 .file-field { display: grid; flex: 1 1 230px; gap: 8px; color: var(--ink); font-size: 13px; font-weight: 600; }
 .file-field input { width: 100%; padding: 8px; border: 1px solid var(--input-border); border-radius: 9px; background: var(--surface); color: var(--ink); font-size: 12px; }
 .saved-file { color: var(--muted); font-weight: 400; overflow-wrap: anywhere; }
-.import-preview { margin-top: 20px; padding: 16px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-alt); overflow-wrap: anywhere; }
-.import-preview h3 { margin: 0; font-size: 15px; }
-.import-preview p { font-size: 13px; line-height: 1.5; }
-.import-preview .selection-bar { margin-bottom: 0; }
-.preview-missing { font-size: 13px; }
-.preview-missing summary { cursor: pointer; font-weight: 700; }
-.preview-missing ul { max-height: 180px; overflow: auto; padding-left: 22px; }
-.history-select { display: grid; gap: 6px; max-width: 430px; font-size: 13px; font-weight: 700; }
-.history-select select { min-width: 0; min-height: 44px; padding: 8px; border: 1px solid var(--input-border); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; }
-.history-files, .history-comparison { overflow-wrap: anywhere; }
-.history-comparison { font-size: 13px; line-height: 1.5; }
-.history-comparison details { margin: 8px 0; }
-.history-comparison summary { cursor: pointer; font-weight: 700; }
-.history-comparison ul { max-height: 220px; overflow: auto; padding-left: 22px; }
 .message { margin: 16px 0 0; }
 .summary-notes { padding: 14px 16px; margin-top: 16px; border-radius: 9px; background: var(--note-bg); color: var(--note-text); font-size: 13px; line-height: 1.5; }
 .summary-notes p { margin: 4px 0; }
@@ -143,10 +129,6 @@ td input[type="checkbox"] { accent-color: var(--accent); }
 .risk-pill.below { background: var(--risk-below-bg); color: var(--risk-below-text); }
 .risk-pill.warning { background: var(--risk-warning-bg); color: var(--risk-warning-text); }
 .risk-pill.danger { background: var(--risk-danger-bg); color: var(--risk-danger-text); }
-.upload-button { position: relative; overflow: hidden; flex: 0 0 auto; }
-.upload-button input { position: absolute; inset: 0; width: 100%; cursor: pointer; opacity: 0; }
-.upload-button.disabled { cursor: progress; opacity: .65; }
-.upload-button.disabled input { cursor: progress; }
 .privacy-note, .success {
   margin: 0 0 18px;
   padding: 12px 14px;
