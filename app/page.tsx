@@ -395,8 +395,8 @@ export default function Home() {
                 <div>
                   <h3>Dias parados</h3>
                   <p className="chart-description">Distribuição por comparação com 15 dias.</p>
-                  <DaysPie days={charts.days} total={counts.total} />
-                  <p className="chart-description">As cores indicam apenas a comparação de dias; não determinam status LOST ou débito.</p>
+                  <DaysLine days={charts.days} total={counts.total} />
+                  <p className="chart-description">Os dias não determinam status LOST ou débito.</p>
                 </div>
                 <div>
                   <h3>Classificação de tratamento</h3>
@@ -535,19 +535,28 @@ function Metric({ label, value }: { label: string; value: number | string }) {
   return <article className="metric-card"><p>{label}</p><strong>{typeof value === "number" ? value.toLocaleString("pt-BR") : value}</strong></article>;
 }
 
-function DaysPie({ days, total }: { days: { below: number; atLimit: number; above: number }; total: number }) {
-  const slices = [
-    { label: "Abaixo de 15 dias", count: days.below, color: "#20bf6b" },
-    { label: "Exatamente 15 dias", count: days.atLimit, color: "#f7b731" },
-    { label: "Acima de 15 dias", count: days.above, color: "#ff6b6b" },
+function DaysLine({ days, total }: { days: { below: number; atLimit: number; above: number }; total: number }) {
+  const items = [
+    { label: "Abaixo de 15 dias", count: days.below },
+    { label: "Exatamente 15 dias", count: days.atLimit },
+    { label: "Acima de 15 dias", count: days.above },
   ];
-  const below = total ? days.below * 100 / total : 0;
-  const atLimit = total ? (days.below + days.atLimit) * 100 / total : 0;
+  const max = Math.max(...items.map((item) => item.count));
+  const points = items.map((item, index) => ({
+    x: (index + 0.5) * 100 / items.length,
+    y: 88 - (max ? item.count * 76 / max : 0),
+  }));
   return (
-    <div className="pie-layout">
-      <div className="pie-chart" aria-hidden="true" style={{ background: total ? `conic-gradient(#20bf6b 0% ${below}%, #f7b731 ${below}% ${atLimit}%, #ff6b6b ${atLimit}% 100%)` : "#dce3eb" }} />
-      <ul className="pie-legend">{slices.map(({ label, count, color }) => (
-        <li key={label}><span className="pie-swatch" style={{ background: color }} aria-hidden="true" /><span>{label}<br /><strong>{count.toLocaleString("pt-BR")} ({(total ? count * 100 / total : 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)</strong></span></li>
+    <div className="days-chart">
+      <div className="days-plot" aria-hidden="true">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+          <line x1="0" y1="88" x2="100" y2="88" className="days-baseline" vectorEffect="non-scaling-stroke" />
+          <polyline points={points.map(({ x, y }) => `${x},${y}`).join(" ")} className="days-line" vectorEffect="non-scaling-stroke" />
+        </svg>
+        {points.map(({ x, y }, index) => <span className="days-point" key={items[index].label} style={{ left: `${x}%`, top: `${y}%` }} />)}
+      </div>
+      <ul className="days-labels">{items.map(({ label, count }) => (
+        <li key={label}><span>{label}</span><strong>{count.toLocaleString("pt-BR")} ({(total ? count * 100 / total : 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)</strong></li>
       ))}</ul>
     </div>
   );
