@@ -44,23 +44,6 @@ export async function saveSnapshot(snapshot: StuckSnapshot): Promise<void> {
   }
 }
 
-export async function removeSnapshotRecord(snapshot: StuckSnapshot, tracking: string): Promise<void> {
-  const db = await openDatabase();
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const transaction = db.transaction(STORE, "readwrite");
-      const store = transaction.objectStore(STORE);
-      store.put({ ...snapshot, records: snapshot.records.filter((record) => record.tracking !== tracking) }, "current");
-      store.delete(TREATMENT_PREFIX + tracking);
-      store.delete(COLOR_PREFIX + tracking);
-      transaction.oncomplete = () => resolve();
-      transaction.onabort = () => reject(new Error("Não foi possível remover a mercadoria salva."));
-    });
-  } finally {
-    db.close();
-  }
-}
-
 export async function readSnapshot(): Promise<StuckSnapshot | null> {
   const db = await openDatabase();
   try {

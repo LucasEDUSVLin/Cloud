@@ -6,9 +6,9 @@ Painel para cruzar o relatório de mercadorias paradas da Shopee com um segundo 
 
 1. Selecione o CSV **STUCK** com as colunas `Operação`, `Cidade`, `Entegador`, `TN`, `Status`, `Dias parados`, `Valor`, `Palavra Chave` e `Avaria`.
 2. Selecione o CSV **status atualizado** com as colunas `Order ID`, `Status`, `Driver Name`, `Driver Phone`, `Current Station`, `Current Station Received Time` e `Delivered Time`.
-3. Clique em **Analisar arquivos**. O sistema cruza `TN` com `Order ID`. Mercadorias novas são adicionadas ao histórico; as já salvas são atualizadas quando aparecem novamente no relatório. Mercadorias antigas ausentes no relatório do dia permanecem salvas, com o último status e dados conhecidos.
+3. Clique em **Analisar arquivos**. O sistema cruza `TN` com `Order ID`. Cada importação substitui a lista anterior: o painel mostra somente as mercadorias do dia, sem histórico. Classificações e cores já salvas continuam valendo para TNs que reaparecem.
 
-Após a importação, o formulário fica oculto. Para importar a base diária, clique em **Atualizar relatórios**. A mensagem informa quantas mercadorias são novas, quantas anteriores foram mantidas e o total no painel. O filtro **Novas** mostra as mercadorias que ainda não receberam uma classificação manual; a sinalização some quando uma classificação é escolhida. As mercadorias ausentes do último relatório são destacadas pela última data de aparição. Use **Remover** na linha para remover manualmente uma mercadoria e sua classificação salva.
+Após a importação, o formulário fica oculto. Para importar a base do dia, clique em **Atualizar relatórios**.
 
 O painel guarda os dois arquivos importados neste navegador. Ao recarregar a página, os arquivos salvos podem ser reutilizados e seus nomes aparecem em **Atualizar relatórios**. O navegador não permite preencher automaticamente os campos de seleção de arquivos, mas é possível selecionar apenas o arquivo que deseja substituir. Importações anteriores a esta função precisam ser feitas novamente para guardar os arquivos. O botão no topo alterna entre os temas claro e escuro, e a preferência fica salva no navegador.
 
@@ -22,21 +22,21 @@ Os dois CSVs devem ter cabeçalhos, de 1 a 10.000 registros, até 10 MB cada, se
 
 O painel exibe, pesquisa e agrupa pelo `Status` do CSV de status atualizado, sem substituí-lo pelo status do relatório STUCK. Pedidos sem correspondência ou sem status nesse CSV mostram "Sem status atualizado".
 
-O tratamento é escolhido manualmente na tabela **Mercadorias** e pode ser alterado ou voltado para **Sem classificação**. A escolha não altera o status da Shopee e é salva por TN neste navegador. As contagens abrangem todo o histórico salvo e não indicam conclusão do tratamento. Os filtros de dias incluem todo o histórico, independentemente do tratamento ou do status atualizado. Selecionar para exportação é independente da classificação; o CSV exportado contém os dados do arquivo de status atualizado, não a classificação manual.
+O tratamento é escolhido manualmente na tabela **Mercadorias** e pode ser alterado ou voltado para **Sem classificação**. A escolha não altera o status da Shopee e é salva por TN neste navegador. As contagens abrangem o relatório do dia e não indicam conclusão do tratamento. Os filtros de dias incluem todo o relatório, independentemente do tratamento ou do status atualizado. Selecionar para exportação é independente da classificação; o CSV exportado contém os dados do arquivo de status atualizado, não a classificação manual.
 
 O botão **Copiar TN (BR)**, ao lado do relatório STUCK, copia os códigos TN do arquivo selecionado (um por linha) para consultar o status atualizado na Shopee.
 
 O indicador de dias usa exclusivamente `Dias parados` do relatório STUCK, sem incrementar os dias após a importação. O painel apenas compara esse número com 15 dias (abaixo, igual ou acima); não infere LOST nem débito. Nenhum dado é criado: tudo vem dos CSVs.
 
-Os gráficos apresentam dados de todo o histórico salvo, sem aplicar os filtros da tabela. Para mercadorias ausentes no último arquivo, os dias, valores e status são os últimos dados importados. A pizza compara os dias parados com 15 dias em verde, amarelo e coral; as barras verticais usam cores diferentes para cada classificação manual. As cores de dias não indicam status LOST nem débito, e classificação manual não significa tratamento concluído.
+Os gráficos apresentam dados do relatório do dia, sem aplicar os filtros da tabela. A pizza compara os dias parados com 15 dias em verde, amarelo e coral; as barras verticais usam cores diferentes para cada classificação manual. As cores de dias não indicam status LOST nem débito, e classificação manual não significa tratamento concluído.
 
-Na coluna **Marcação**, escolha uma cor na paleta para destacar o BR. A marcação é salva por TN neste navegador, permanece nas importações seguintes e pode ser removida selecionando **Sem cor**. Ela é apenas visual e não altera tratamento, status nem exportação.
+Na coluna **Marcação**, escolha uma cor na paleta para pintar a linha inteira do BR. A marcação é salva por TN neste navegador, permanece enquanto o TN reaparecer nas importações e pode ser removida selecionando **Sem cor**. Ela é apenas visual e não altera tratamento, status nem exportação.
 
 Os indicadores financeiros somam o campo `Valor` do relatório STUCK em reais: o total inclui todos os registros da lista, e a distribuição por status usa o `Status` do CSV atualizado. O débito por LOST considera somente registros cujo status atualizado seja exatamente `LOST` (sem diferenciar maiúsculas de minúsculas); dias parados acima de 15 não são tratados como LOST. Valores fora do formato numérico com ponto decimal e até duas casas são rejeitados para evitar totais incorretos.
 
 ## Privacidade e armazenamento
 
-O site funciona sem login. O histórico mesclado, os dois arquivos completos da importação mais recente (incluindo linhas adicionais que não entram no painel) e as marcações de tratamento por TN ficam no IndexedDB deste navegador; esses dados podem conter informações pessoais. Os dados não são enviados ao GitHub, mas outra pessoa com acesso ao mesmo perfil de navegador pode vê-los. Os arquivos CSV baixados devem ser protegidos separadamente. Os dados não são sincronizados entre computadores, podem ser apagados ao limpar os dados do site e não substituem backups protegidos dos arquivos originais.
+O site funciona sem login. Os dois arquivos completos da importação mais recente (incluindo linhas adicionais que não entram no painel) e as marcações de tratamento por TN ficam no IndexedDB deste navegador; esses dados podem conter informações pessoais. Os dados não são enviados ao GitHub, mas outra pessoa com acesso ao mesmo perfil de navegador pode vê-los. Os arquivos CSV baixados devem ser protegidos separadamente. Os dados não são sincronizados entre computadores, podem ser apagados ao limpar os dados do site e não substituem backups protegidos dos arquivos originais.
 
 O banco da versão anterior não é removido nem migrado; o novo painel usa um banco separado. Sites em caminhos diferentes sob o mesmo domínio `github.io` compartilham a mesma origem e podem acessar o armazenamento uns dos outros. Para proteger dados pessoais, prefira um domínio dedicado e um dispositivo e perfil de navegador de acesso restrito.
 

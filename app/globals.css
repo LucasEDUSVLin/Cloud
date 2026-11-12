@@ -3,14 +3,14 @@
   --ink: #202a35;
   --muted: #596777;
   --line: #d7dfe7;
-  --accent: #b94521;
-  --accent-text: #963817;
-  --background: #f3f6f9;
+  --accent: #5b4bdb;
+  --accent-text: #4636c0;
+  --background: #eef1fb;
   --surface: #ffffff;
   --surface-alt: #f7f9fb;
-  --soft-accent: #fff1e9;
-  --note-bg: #eff5fa;
-  --note-text: #314b60;
+  --soft-accent: #e8e5ff;
+  --note-bg: #e6f2ff;
+  --note-text: #1f4a75;
   --input-border: #b9c6d1;
   --button-text: #ffffff;
   --danger-text: #a42525;
@@ -28,17 +28,17 @@
   color-scheme: dark;
   --ink: #edf2f7;
   --muted: #bac6d2;
-  --line: #3c4a59;
-  --accent: #ff9a6f;
-  --accent-text: #ffb393;
-  --background: #111820;
-  --surface: #202b36;
-  --surface-alt: #273441;
-  --soft-accent: #493126;
-  --note-bg: #263846;
+  --line: #3a4263;
+  --accent: #9d94ff;
+  --accent-text: #bcb6ff;
+  --background: #0f1220;
+  --surface: #1b2033;
+  --surface-alt: #242b44;
+  --soft-accent: #34306b;
+  --note-bg: #1d3550;
   --note-text: #d0e3ef;
   --input-border: #67798b;
-  --button-text: #31190f;
+  --button-text: #14103a;
   --danger-text: #ffaaaa;
   --success-bg: #163d30;
   --success-text: #a8e7c7;
@@ -216,10 +216,11 @@ th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 12
 th { background: var(--surface-alt); color: var(--muted); font-size: 11px; font-weight: 700; }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--surface-alt); }
+tbody tr.marked-row { background: var(--row-color); color: var(--row-text); }
+tbody tr.marked-row:hover { background: var(--row-color); filter: brightness(.93); }
+tbody tr.marked-row .order-id { color: inherit; }
+tbody tr.marked-row td { border-bottom-color: rgba(0, 0, 0, .12); }
 .order-id { color: var(--accent-text); font-weight: 700; }
-.new-badge { display: inline-block; padding: 3px 6px; margin-left: 7px; border-radius: 999px; background: var(--risk-warning-bg); color: var(--risk-warning-text); font-size: 9px; font-weight: 800; vertical-align: middle; }
-.cell-note { display: block; max-width: 190px; margin-top: 5px; color: var(--muted); font-size: 10px; white-space: normal; }
-.remove-button { color: var(--danger-text); font-size: 11px; }
 .status-pill { display: inline-block; padding: 4px 8px; border-radius: 99px; background: var(--risk-below-bg); color: var(--risk-below-text); font-size: 11px; }
 .empty-state { margin: 0; padding: 28px 12px; color: var(--muted); font-size: 13px; text-align: center; }
 .pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; color: var(--muted); font-size: 12px; }

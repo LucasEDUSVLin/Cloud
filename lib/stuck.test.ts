@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Papa from "papaparse";
-import { delivered, exportFilename, exportSelectedCsv, extractTrackingNumbers, mergeStuckSnapshots, parseValueCents, processStuckFiles, risk, valueTotals } from "./stuck";
+import { delivered, exportFilename, exportSelectedCsv, extractTrackingNumbers, parseValueCents, processStuckFiles, risk, valueTotals } from "./stuck";
 
 const stuckHeader = "Operação,Cidade,Entegador,TN,Status,Dias parados,Valor,Palavra Chave,Avaria";
 const statusHeader = "Order ID,Status,Driver Name,Driver Phone,Current Station,Current Station Received Time,Delivered Time";
@@ -11,38 +11,6 @@ describe("relatórios STUCK", () => {
   it("nomeia o arquivo usando a data e hora locais da exportação", () => {
     expect(exportFilename(new Date(2026, 10, 11, 12, 55))).toBe("Stuck-11-11-2026-12-55.csv");
     expect(exportFilename(new Date(2026, 0, 2, 3, 4))).toBe("Stuck-02-01-2026-03-04.csv");
-  });
-
-  it("mescla a importação diária sem apagar histórico, atualiza os dados vistos e marca TN novas", () => {
-    const previous = processStuckFiles(
-      [stuckHeader, stuckRow("A", "8"), stuckRow("B", "9")].join("\n"),
-      [statusHeader, statusRow("A", "OnHold"), statusRow("B", "Hub_Received")].join("\n"),
-    );
-    previous.importedAt = "2026-11-10T12:00:00.000Z";
-    previous.records.forEach((record) => {
-      record.lastSeenAt = previous.importedAt;
-      record.lastUpdatedAt = previous.importedAt;
-      record.isNew = false;
-    });
-    const current = processStuckFiles(
-      [stuckHeader, stuckRow("B", "10"), stuckRow("C", "2")].join("\n"),
-      [statusHeader, statusRow("B", "Delivered")].join("\n"),
-    );
-    current.importedAt = "2026-11-11T12:00:00.000Z";
-
-    const merged = mergeStuckSnapshots(previous, current);
-    expect(merged.records.map((record) => record.tracking)).toEqual(["B", "C", "A"]);
-    expect(merged.records.map((record) => record.isNew)).toEqual([false, true, false]);
-    expect(merged.records[0].days).toBe(10);
-    expect(merged.records[0].updatedStatus).toBe("Delivered");
-    expect(merged.records[0].lastSeenAt).toBe(current.importedAt);
-    expect(merged.records[0].lastUpdatedAt).toBe(current.importedAt);
-    expect(merged.records[1].updatedStatus).toBeNull();
-    expect(merged.records[1].source?.stuck.TN).toBe("C");
-    expect(merged.records[2].days).toBe(8);
-    expect(merged.records[2].updatedStatus).toBe("OnHold");
-    expect(merged.records[2].lastSeenAt).toBe(previous.importedAt);
-    expect(merged.records[2].lastUpdatedAt).toBe(previous.importedAt);
   });
 
   it("cruza por TN e Order ID, conserva apenas a lista STUCK e distingue entregues", () => {
